@@ -3,6 +3,7 @@ package com.ontometrics.db.graph;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
+import java.util.Iterator;
 
 import javax.persistence.Id;
 
@@ -114,6 +115,14 @@ public class EntityManager {
 		return database.index().forNodes(superClass.getName());
 	}
 
+	public Index<Relationship> getRelationshipIndex(Class<?> aClass, String name) {
+		Class<?> superClass = aClass;
+		while (superClass != null && !superClass.getName().equals(Object.class.getName())){
+			superClass = superClass.getSuperclass(); 
+		}
+		return database.index().forRelationships(superClass.getName() + "." + name);
+	}
+
 	/**
 	 * Set properties or relationships for the given node based on the value type. if the value is a primitive, it will
 	 * creates a property for it. if the value is not primitive but has a converter, it will use the converter to create
@@ -164,6 +173,12 @@ public class EntityManager {
 		if(node.hasProperty(name)){
 			log.debug("update index for property with name '{}' and primitive type '{}'", name, value.getClass());
 			getNodeIndex(aClass).add(node, name, value);
+		}else{
+//TODO should be revised to set appropriate key/value
+			Iterator<Relationship> iterator = node.getRelationships(DynamicRelationshipType.withName(name)).iterator();
+			while(iterator.hasNext()){
+				getRelationshipIndex(aClass, name).add(iterator.next(), name, "");
+			}
 		}
 		return;
 	}
@@ -181,6 +196,14 @@ public class EntityManager {
 			getNodeIndex(aClass).remove(node, name);
 			if(value != null){
 				getNodeIndex(aClass).add(node, name, value);
+			}
+		}else{
+			if(value == null){
+				//TODO check back for collections
+				Iterator<Relationship> iterator = node.getRelationships(DynamicRelationshipType.withName(name)).iterator();
+				while(iterator.hasNext()){
+					getRelationshipIndex(aClass, name).remove(iterator.next());
+				}
 			}
 		}
 	}
@@ -212,14 +235,9 @@ public class EntityManager {
 		if (node.hasProperty(name)) {
 			node.removeProperty(name);
 		} else {
-			Relationship relationship = node.getSingleRelationship(new RelationshipType() {
-
-				public String name() {
-					return name;
-				}
-			}, Direction.OUTGOING);
-			if (relationship != null) {
-				relationship.delete();
+			Iterator<Relationship> iterator = node.getRelationships(Direction.OUTGOING, DynamicRelationshipType.withName(name)).iterator();
+			while(iterator.hasNext()){
+				iterator.next().delete();
 			}
 		}
 
