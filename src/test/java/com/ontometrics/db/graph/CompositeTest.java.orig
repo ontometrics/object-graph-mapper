@@ -44,6 +44,10 @@ public class CompositeTest {
 		pete.addSubordinate(joe);
 		pete.addSubordinate(jim);
 		pete.addSubordinate(bob);
+<<<<<<< HEAD
+		pete.addSubordinate(pete);
+=======
+>>>>>>> upstream/master
 		
 		managerRepository.create(pete);
 		
