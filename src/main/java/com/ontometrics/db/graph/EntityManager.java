@@ -67,16 +67,29 @@ public class EntityManager {
 			while (clazz != null && !clazz.getName().equals(Object.class.getName())) {
 				log.debug("processing class: {}", clazz);
 				for (Field field : clazz.getDeclaredFields()) {
-					try {
-						field.setAccessible(true);
-						if (!Modifier.isTransient(field.getModifiers())) {
-							setProperty(node, field.getName(), field.get(entity));
-							if (isThePrimaryKey(field)) {
-								getNodeIndex(entity).add(node, PRIMARY_KEY, field.get(entity));
+					field.setAccessible(true);
+					if (!Modifier.isTransient(field.getModifiers())) {
+						Object value = null;
+						try {
+							value = field.get(entity);
+						} catch (IllegalArgumentException e) {
+							log.error("Error getting the field value from " + entity, e);
+							continue;
+						} catch (IllegalAccessException e) {
+							log.error("Error getting the field value from " + entity, e);
+							continue;
+						}						
+						setProperty(node, field.getName(), value);
+						if(field.isAnnotationPresent(com.ontometrics.db.graph.Index.class) && value != null){
+							addIndex(entity.getClass(), node, field.getName(), value);
+						}
+						if (isThePrimaryKey(field)) {
+							if (value != null) {
+								getNodeIndex(entity.getClass()).add(node, PRIMARY_KEY, value);
+							} else {
+								throw new IllegalArgumentException("Primary key cannot be null");
 							}
 						}
-					} catch (Exception e) {
-						log.error("error creating node for entity: " + entity, e);
 					}
 				}
 				clazz = clazz.getSuperclass();
@@ -92,8 +105,12 @@ public class EntityManager {
 	 * @param entity
 	 * @return the database index for the given entity's class
 	 */
-	public Index<Node> getNodeIndex(Object entity) {
-		return database.index().forNodes(entity.getClass().getName());
+	public Index<Node> getNodeIndex(Class<?> aClass) {
+		Class<?> superClass = aClass;
+		while (superClass != null && !superClass.getName().equals(Object.class.getName())){
+			superClass = superClass.getSuperclass(); 
+		}
+		return database.index().forNodes(superClass.getName());
 	}
 
 	/**
@@ -107,7 +124,7 @@ public class EntityManager {
 	 * @param value
 	 */
 	private void setProperty(Node node, final String name, Object value) {
-		if (value == null) {
+		if (value == null) {			
 			removeValueIfExists(node, name);
 			return; // we are not setting null values
 		}
@@ -135,14 +152,50 @@ public class EntityManager {
 		}
 
 	}
+	/**
+	 * index the given property in the given class
+	 * @param aClass 
+	 * @param node
+	 * @param name
+	 * @param value
+	 */
+	private void addIndex(Class<?> aClass, Node node, String name, Object value) {
+		if(node.hasProperty(name)){
+			log.debug("update index for property with name '{}' and primitive type '{}'", name, value.getClass());
+			getNodeIndex(aClass).add(node, name, value);
+		}
+		return;
+	}
+	
+	/**
+	 * update the index value
+	 * 
+	 * @param aClass
+	 * @param node
+	 * @param name
+	 * @param value
+	 */
+	private void updateIndex(Class<?> aClass, Node node, String name, Object value) {
+		if(node.hasProperty(name)){
+			getNodeIndex(aClass).remove(node, name);
+			if(value != null){
+				getNodeIndex(aClass).add(node, name, value);
+			}
+		}
+	}
 
 	public Node update(Object entity, Node existingNode) {
 		Transaction transaction = database.beginTx();
 		for (Field field : entity.getClass().getDeclaredFields()) {
 			try {
 				field.setAccessible(true);
+				Object value = field.get(entity);
+				if(field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)){
+					updateIndex(entity.getClass(), existingNode, field.getName(), value);
+				}
+
 				if (!Modifier.isTransient(field.getModifiers())) {
-					setProperty(existingNode, field.getName(), field.get(entity));
+					setProperty(existingNode, field.getName(), value);
 				}
 				transaction.success();
 			} catch (Exception e) {
@@ -218,7 +271,7 @@ public class EntityManager {
 			}
 		}
 		if (primaryKey != null) {
-			return getNodeIndex(entity).get(PRIMARY_KEY, primaryKey).getSingle();
+			return getNodeIndex(entity.getClass()).get(PRIMARY_KEY, primaryKey).getSingle();
 		}
 		return null;
 	}
@@ -266,5 +319,6 @@ public class EntityManager {
 	public void createRelationship(Node fromNode, Node toNode, RelationshipType type) {
 		fromNode.createRelationshipTo(toNode, type);
 	}
+
 
 }
