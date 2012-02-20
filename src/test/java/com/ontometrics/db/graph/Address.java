@@ -2,6 +2,8 @@ package com.ontometrics.db.graph;
 
 import javax.persistence.Id;
 
+import com.ontometrics.db.graph.Person;
+
 
 public class Address {
 

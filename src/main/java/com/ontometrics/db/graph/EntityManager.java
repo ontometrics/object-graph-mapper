@@ -7,6 +7,7 @@ import java.util.Collection;
 import javax.persistence.Id;
 
 import org.neo4j.graphdb.Direction;
+import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
@@ -240,11 +241,7 @@ public class EntityManager {
 		} else {
 			log.debug("found existing node for the relationship '{}'", name);
 		}
-		node.createRelationshipTo(toNode, new RelationshipType() {
-			public String name() {
-				return name;
-			}
-		});
+		node.createRelationshipTo(toNode, DynamicRelationshipType.withName(name));
 
 	}
 
