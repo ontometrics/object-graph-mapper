@@ -44,7 +44,6 @@ public class CompositeTest {
 		pete.addSubordinate(joe);
 		pete.addSubordinate(jim);
 		pete.addSubordinate(bob);
-		pete.addSubordinate(pete);
 		
 		managerRepository.create(pete);
 		
