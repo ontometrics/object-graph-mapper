@@ -6,23 +6,26 @@ import java.util.Set;
 
 import javax.persistence.Id;
 
-
 public class Person {
 
 	@Id
 	private String name;
-	
-	transient private long visitDuration = 1000; 
+
+	transient private long visitDuration = 1000;
 
 	private Date birthDate;
 
 	private Address address;
-	
-	private Person parent;  
-	
+
+	private Person parent;
+
 	private Set<Person> friends = new HashSet<Person>();
-	
+
 	public Person() {
+	}
+
+	public Person(String name) {
+		this.name = name;
 	}
 
 	public Person(String name, Date birthdate) {
@@ -44,7 +47,7 @@ public class Person {
 
 	public void setAddress(Address address) {
 		this.address = address;
-		if(address != null){
+		if (address != null) {
 			this.address.setOwner(this);
 		}
 	}
@@ -63,10 +66,10 @@ public class Person {
 
 	public void setFriends(Set<Person> friends) {
 		this.friends = friends;
-	}			
-	
+	}
+
 	public long getVisitDuration() {
 		return visitDuration;
 	}
-	
+
 }
