@@ -11,12 +11,14 @@ public class Person {
 	@Id
 	private String name;
 
-	transient private long visitDuration = 1000;
+	transient private long visitDuration = 1000; 
 
+	@Index
 	private Date birthDate;
 
 	private Address address;
 
+	@Index
 	private Person parent;
 
 	private Set<Person> friends = new HashSet<Person>();
@@ -35,6 +37,10 @@ public class Person {
 
 	public String getName() {
 		return name;
+	}
+
+	public void setBirthDate(Date birthDate) {
+		this.birthDate = birthDate;
 	}
 
 	public Date getBirthDate() {

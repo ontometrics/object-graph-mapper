@@ -97,13 +97,29 @@ public class EntityManagerTest {
 
 		assertThat((String)personNode.getProperty("name"), is(username));
 		
-		Node indexedNode = entityManager.getNodeIndex(person).get(EntityManager.PRIMARY_KEY, username).getSingle();
+		Node indexedNode = entityManager.getNodeIndex(Person.class).get(EntityManager.PRIMARY_KEY, username).getSingle();
 		assertThat(indexedNode, is(personNode));
 		
-		Node notIndexedPerson = entityManager.getNodeIndex(person).get(EntityManager.PRIMARY_KEY, "xxx").getSingle();
+		Node notIndexedPerson = entityManager.getNodeIndex(Person.class).get(EntityManager.PRIMARY_KEY, "xxx").getSingle();
 		assertThat(notIndexedPerson, nullValue());
+
 	}
-	
+
+	@Test
+	public void indexingProperties(){
+		Node personNode = entityManager.create(person);
+
+		Node indexedNode = entityManager.getNodeIndex(Person.class).get("birthDate", birthdate).getSingle();
+		assertThat(indexedNode, is(personNode));
+		
+		person.setBirthDate(null);
+		
+		entityManager.update(person, personNode);
+		indexedNode = entityManager.getNodeIndex(Person.class).get("birthDate", birthdate).getSingle();
+		assertThat(indexedNode, nullValue());
+
+	}
+
 	@Test
 	public void createEntityWithRelationships(){
 		Person parent = new Person("williams", new DateTime().minusYears(50).toDate());
