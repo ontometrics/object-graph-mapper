@@ -27,20 +27,21 @@ public class GraphDBEntityBuilder {
 
 	public static final String PRIMARY_KEY = "PrimarykeyIndex";
 
-	//the map is to hold created entities to use it to avoid circular references
+	// the map is to hold created entities to use it to avoid circular
+	// references
 	private Map<Node, Object> entitiesMap = new HashMap<Node, Object>();
-	
+
 	public static void buildEntity(Node node, Object entity) {
 		GraphDBEntityBuilder builder = new GraphDBEntityBuilder();
 		builder.build(node, entity);
-		//clean after build is done
+		// clean after build is done
 		builder.entitiesMap = new HashMap<Node, Object>();
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	private void build(Node node, Object entity) {
 		entitiesMap.put(node, entity);
-		
+
 		log.debug("looking for keys from node: {}", node.toString());
 		for (String key : node.getPropertyKeys()) {
 			log.info("evaluating key: {}", key);
@@ -73,9 +74,9 @@ public class GraphDBEntityBuilder {
 					fieldType = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
 				}
 				Object value = null;
-				if(entitiesMap.containsKey(relationship.getEndNode())){
+				if (entitiesMap.containsKey(relationship.getEndNode())) {
 					value = entitiesMap.get(relationship.getEndNode());
-				}else{
+				} else {
 					value = newInstanceOfClass(fieldType);
 					build(relationship.getEndNode(), value);
 				}
@@ -103,7 +104,7 @@ public class GraphDBEntityBuilder {
 			}
 		}
 	}
-	
+
 	/**
 	 * Returns an instance of a collection based on the given type
 	 * 
