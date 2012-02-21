@@ -3,9 +3,12 @@ package com.ontometrics.db.graph;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 import javax.persistence.Id;
+import javax.persistence.Transient;
 
 import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.DynamicRelationshipType;
@@ -34,6 +37,8 @@ public class EntityManager {
 	public static final String PRIMARY_KEY = "PrimarykeyIndex";
 
 	private static Node referenceNode;
+	
+	private static Set<String> coreTypes;
 
 	/**
 	 * The database we are using through this manager.
@@ -49,6 +54,11 @@ public class EntityManager {
 	 */
 	public EntityManager(EmbeddedGraphDatabase database) {
 		this.database = database;
+		coreTypes = new HashSet<String>();
+		coreTypes.add(Object.class.getName());
+		coreTypes.add(Double.class.getName());
+		coreTypes.add(Long.class.getName());
+		coreTypes.add(Integer.class.getName());
 	}
 
 	/**
@@ -66,11 +76,11 @@ public class EntityManager {
 		try {
 			Node node = database.createNode();
 			Class clazz = entity.getClass();
-			while (clazz != null && !clazz.getName().equals(Object.class.getName())) {
+			while (clazz != null && !coreType(clazz)) {
 				log.debug("processing class: {}", clazz);
 				for (Field field : clazz.getDeclaredFields()) {
 					field.setAccessible(true);
-					if (!Modifier.isTransient(field.getModifiers())) {
+					if (!isTransient(field)) {
 						Object value = null;
 						try {
 							value = field.get(entity);
@@ -101,6 +111,16 @@ public class EntityManager {
 		} finally {
 			transaction.finish();
 		}
+	}
+
+	private boolean coreType(Class<?> clazz) {
+		//clazz.getName().equals(Object.class.getName())
+		return coreTypes.contains(clazz.getName());
+	}
+
+	private boolean isTransient(Field field) {
+		boolean isTransient = Modifier.isTransient(field.getModifiers()) || field.isAnnotationPresent(Transient.class);
+		return isTransient;
 	}
 
 	/**
