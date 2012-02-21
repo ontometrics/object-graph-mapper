@@ -37,7 +37,7 @@ public class EntityManager {
 	public static final String PRIMARY_KEY = "PrimarykeyIndex";
 
 	private static Node referenceNode;
-	
+
 	private static Set<String> coreTypes;
 
 	/**
@@ -46,8 +46,8 @@ public class EntityManager {
 	private EmbeddedGraphDatabase database;
 
 	/**
-	 * Passed in on creation. This just wraps itself around the database and offers basic help with CRUD support for
-	 * corresponding repositories.
+	 * Passed in on creation. This just wraps itself around the database and
+	 * offers basic help with CRUD support for corresponding repositories.
 	 * 
 	 * @param database
 	 *            the database we will be using in this session
@@ -70,37 +70,40 @@ public class EntityManager {
 		return database;
 	}
 
-	@SuppressWarnings("rawtypes")
 	public Node create(Object entity) {
 		Transaction transaction = database.beginTx();
 		try {
 			Node node = database.createNode();
-			Class clazz = entity.getClass();
+			Class<?> clazz = entity.getClass();
 			while (clazz != null && !coreType(clazz)) {
 				log.debug("processing class: {}", clazz);
 				for (Field field : clazz.getDeclaredFields()) {
 					field.setAccessible(true);
 					if (!isTransient(field)) {
-						Object value = null;
-						try {
-							value = field.get(entity);
-						} catch (IllegalArgumentException e) {
-							log.error("Error getting the field value from " + entity, e);
-							continue;
-						} catch (IllegalAccessException e) {
-							log.error("Error getting the field value from " + entity, e);
-							continue;
-						}						
+						Object value = getFieldValue(entity, field);
+						if (value == null) {
+							if (isThePrimaryKey(field)) {
+								throw new IllegalArgumentException("Primary key cannot be null");
+							} else {
+								continue;
+							}
+						}
 						setProperty(node, field.getName(), value);
-						if(field.isAnnotationPresent(com.ontometrics.db.graph.Index.class) && value != null){
-							addIndex(entity.getClass(), node, field.getName(), value);
+						//index the entity using the key/value in the index annotation
+						if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
+							String indexKey = field.getAnnotation(com.ontometrics.db.graph.Index.class).key();
+							String indexValueName = field.getAnnotation(com.ontometrics.db.graph.Index.class).value();
+							Object indexValue = null;
+							if (indexKey.equals("n/a")) {
+								indexKey = field.getName();
+							}
+							if (!indexValueName.equals("n/a")) {
+								indexValue = getFieldValue(entity, getFieldWithName(entity, indexValueName));
+							}
+							addIndex(entity.getClass(), node, field.getName(), value, indexKey, indexValue);
 						}
 						if (isThePrimaryKey(field)) {
-							if (value != null) {
-								getNodeIndex(entity.getClass()).add(node, PRIMARY_KEY, value);
-							} else {
-								throw new IllegalArgumentException("Primary key cannot be null");
-							}
+							getNodeIndex(entity.getClass()).add(node, PRIMARY_KEY, value);
 						}
 					}
 				}
@@ -113,8 +116,52 @@ public class EntityManager {
 		}
 	}
 
+	/**
+	 * 
+	 * @param entity
+	 * @param name
+	 * @return field with the given name in the given entity
+	 */
+	private Field getFieldWithName(Object entity, String name) {
+		Class<?> clazz = entity.getClass();
+		while (clazz != null && !coreType(clazz)) {
+			log.debug("processing class: {}", clazz);
+			Field field = null;
+			try {
+				field = clazz.getDeclaredField(name);
+			} catch (SecurityException e) {
+			} catch (NoSuchFieldException e) {
+			}
+			if (field != null) {
+				return field;
+			}
+			clazz = clazz.getSuperclass();
+		}
+		return null;
+	}
+
+	/**
+	 * return the value of the given field in the given entity
+	 * 
+	 * @param entity
+	 * @param field
+	 * @return
+	 */
+	private Object getFieldValue(Object entity, Field field) {
+		Object value = null;
+		try {
+			field.setAccessible(true);
+			value = field.get(entity);
+		} catch (IllegalArgumentException e) {
+			log.error("Error getting the field value from " + entity, e);
+		} catch (IllegalAccessException e) {
+			log.error("Error getting the field value from " + entity, e);
+		}
+		return value;
+	}
+
 	private boolean coreType(Class<?> clazz) {
-		//clazz.getName().equals(Object.class.getName())
+		// clazz.getName().equals(Object.class.getName())
 		return coreTypes.contains(clazz.getName());
 	}
 
@@ -129,32 +176,34 @@ public class EntityManager {
 	 */
 	public Index<Node> getNodeIndex(Class<?> aClass) {
 		Class<?> superClass = aClass;
-		while (superClass != null && !superClass.getName().equals(Object.class.getName())){
-			superClass = superClass.getSuperclass(); 
+		while (superClass != null && !superClass.getName().equals(Object.class.getName())) {
+			superClass = superClass.getSuperclass();
 		}
 		return database.index().forNodes(superClass.getName());
 	}
 
 	public Index<Relationship> getRelationshipIndex(Class<?> aClass, String name) {
 		Class<?> superClass = aClass;
-		while (superClass != null && !superClass.getName().equals(Object.class.getName())){
-			superClass = superClass.getSuperclass(); 
+		while (superClass != null && !superClass.getName().equals(Object.class.getName())) {
+			superClass = superClass.getSuperclass();
 		}
 		return database.index().forRelationships(superClass.getName() + "." + name);
 	}
 
 	/**
-	 * Set properties or relationships for the given node based on the value type. if the value is a primitive, it will
-	 * creates a property for it. if the value is not primitive but has a converter, it will use the converter to create
-	 * the property. if the value is not primitive and doesn't have a converter it will create a relationship. if the
-	 * value is a collection, it will create a relationship for all its elements.
+	 * Set properties or relationships for the given node based on the value
+	 * type. if the value is a primitive, it will creates a property for it. if
+	 * the value is not primitive but has a converter, it will use the converter
+	 * to create the property. if the value is not primitive and doesn't have a
+	 * converter it will create a relationship. if the value is a collection, it
+	 * will create a relationship for all its elements.
 	 * 
 	 * @param node
 	 * @param name
 	 * @param value
 	 */
 	private void setProperty(Node node, final String name, Object value) {
-		if (value == null) {			
+		if (value == null) {
 			removeValueIfExists(node, name);
 			return; // we are not setting null values
 		}
@@ -182,27 +231,31 @@ public class EntityManager {
 		}
 
 	}
+
 	/**
 	 * index the given property in the given class
-	 * @param aClass 
+	 * 
+	 * @param aClass
 	 * @param node
 	 * @param name
 	 * @param value
+	 * @param indexValue
+	 * @param indexKey
 	 */
-	private void addIndex(Class<?> aClass, Node node, String name, Object value) {
-		if(node.hasProperty(name)){
+	private void addIndex(Class<?> aClass, Node node, String name, Object value, String indexKey, Object indexValue) {
+		if (node.hasProperty(name)) {
 			log.debug("update index for property with name '{}' and primitive type '{}'", name, value.getClass());
-			getNodeIndex(aClass).add(node, name, value);
-		}else{
-//TODO should be revised to set appropriate key/value
+			getNodeIndex(aClass).add(node, indexKey, value);
+		} else {
+
 			Iterator<Relationship> iterator = node.getRelationships(DynamicRelationshipType.withName(name)).iterator();
-			while(iterator.hasNext()){
-				getRelationshipIndex(aClass, name).add(iterator.next(), name, "");
+			while (iterator.hasNext()) {
+				getRelationshipIndex(aClass, name).add(iterator.next(), indexKey, indexValue);
 			}
 		}
 		return;
 	}
-	
+
 	/**
 	 * update the index value
 	 * 
@@ -212,16 +265,17 @@ public class EntityManager {
 	 * @param value
 	 */
 	private void updateIndex(Class<?> aClass, Node node, String name, Object value) {
-		if(node.hasProperty(name)){
+		if (node.hasProperty(name)) {
 			getNodeIndex(aClass).remove(node, name);
-			if(value != null){
+			if (value != null) {
 				getNodeIndex(aClass).add(node, name, value);
 			}
-		}else{
-			if(value == null){
-				//TODO check back for collections
-				Iterator<Relationship> iterator = node.getRelationships(DynamicRelationshipType.withName(name)).iterator();
-				while(iterator.hasNext()){
+		} else {
+			if (value == null) {
+				// TODO check back for collections
+				Iterator<Relationship> iterator = node.getRelationships(DynamicRelationshipType.withName(name))
+						.iterator();
+				while (iterator.hasNext()) {
 					getRelationshipIndex(aClass, name).remove(iterator.next());
 				}
 			}
@@ -234,7 +288,7 @@ public class EntityManager {
 			try {
 				field.setAccessible(true);
 				Object value = field.get(entity);
-				if(field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)){
+				if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
 					updateIndex(entity.getClass(), existingNode, field.getName(), value);
 				}
 
@@ -255,8 +309,9 @@ public class EntityManager {
 		if (node.hasProperty(name)) {
 			node.removeProperty(name);
 		} else {
-			Iterator<Relationship> iterator = node.getRelationships(Direction.OUTGOING, DynamicRelationshipType.withName(name)).iterator();
-			while(iterator.hasNext()){
+			Iterator<Relationship> iterator = node.getRelationships(Direction.OUTGOING,
+					DynamicRelationshipType.withName(name)).iterator();
+			while (iterator.hasNext()) {
 				iterator.next().delete();
 			}
 		}
@@ -264,8 +319,9 @@ public class EntityManager {
 	}
 
 	/**
-	 * Create relationship from the given node, with a type has the given name. The end node will be the node for the
-	 * given value, if a node exists it will use it, if not it will create new node.
+	 * Create relationship from the given node, with a type has the given name.
+	 * The end node will be the node for the given value, if a node exists it
+	 * will use it, if not it will create new node.
 	 * 
 	 * @param node
 	 * @param name
@@ -284,10 +340,11 @@ public class EntityManager {
 	}
 
 	/**
-	 * Returns existing node for given entity, it will get the primary key of the entity and then load the entity from
-	 * the index using it.
+	 * Returns existing node for given entity, it will get the primary key of
+	 * the entity and then load the entity from the index using it.
 	 * 
-	 * If there is no primary key, or the index doesn't have the found primary key, method will return null
+	 * If there is no primary key, or the index doesn't have the found primary
+	 * key, method will return null
 	 * 
 	 * @param entity
 	 * @return
@@ -354,6 +411,5 @@ public class EntityManager {
 	public void createRelationship(Node fromNode, Node toNode, RelationshipType type) {
 		fromNode.createRelationshipTo(toNode, type);
 	}
-
 
 }

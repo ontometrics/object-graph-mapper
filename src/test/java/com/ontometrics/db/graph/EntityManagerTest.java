@@ -132,14 +132,14 @@ public class EntityManagerTest {
 		Relationship parentRelationShip = personNode.getSingleRelationship(parentType, Direction.OUTGOING);
 
 		ReadableRelationshipIndex parentsIndex = (ReadableRelationshipIndex) entityManager.getRelationshipIndex(Person.class, "parent"); 
-		IndexHits<Relationship> relationships = parentsIndex.get( "child", "rob", personNode, null );
+		IndexHits<Relationship> relationships = parentsIndex.get( "child", username, personNode, null );
 		assertThat(relationships.hasNext(), is(true));
 		assertThat(relationships.next(), is(parentRelationShip));
 		
 		
 		person.setParent(null);
 		entityManager.update(person, personNode);		
-		relationships = parentsIndex.get( "child", "rob", personNode, null );
+		relationships = parentsIndex.get( "child", username, personNode, null );
 		assertThat(relationships.hasNext(), is(false));
 		
 	}
