@@ -36,7 +36,7 @@ public class EntityManager {
 	public static final String PRIMARY_KEY = "PrimarykeyIndex";
 
 	private static Node referenceNode;
-	
+
 	private static Set<String> coreTypes;
 
 	/**
@@ -45,8 +45,8 @@ public class EntityManager {
 	private EmbeddedGraphDatabase database;
 
 	/**
-	 * Passed in on creation. This just wraps itself around the database and offers basic help with CRUD support for
-	 * corresponding repositories.
+	 * Passed in on creation. This just wraps itself around the database and
+	 * offers basic help with CRUD support for corresponding repositories.
 	 * 
 	 * @param database
 	 *            the database we will be using in this session
@@ -69,13 +69,23 @@ public class EntityManager {
 		return database;
 	}
 
+	/**
+	 * Provides a means of persisting any object. Will use reflection to find
+	 * the properties that should be persisted, will then write them to the
+	 * corresponding node in the graph.
+	 * 
+	 * @param entity
+	 *            the populated entity that the caller would like to put in the
+	 *            database
+	 * @return the node that was built
+	 */
 	@SuppressWarnings("rawtypes")
 	public Node create(Object entity) {
 		Transaction transaction = database.beginTx();
 		try {
 			Node node = database.createNode();
 			Class clazz = entity.getClass();
-			while (clazz != null && !coreType(clazz)) {
+			while (clazz != null && !isCoreType(clazz)) {
 				log.debug("processing class: {}", clazz);
 				for (Field field : clazz.getDeclaredFields()) {
 					field.setAccessible(true);
@@ -89,9 +99,9 @@ public class EntityManager {
 						} catch (IllegalAccessException e) {
 							log.error("Error getting the field value from " + entity, e);
 							continue;
-						}						
+						}
 						setProperty(node, field.getName(), value);
-						if(field.isAnnotationPresent(com.ontometrics.db.graph.Index.class) && value != null){
+						if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class) && value != null) {
 							addIndex(entity.getClass(), node, field.getName(), value);
 						}
 						if (isThePrimaryKey(field)) {
@@ -112,40 +122,35 @@ public class EntityManager {
 		}
 	}
 
-	private boolean coreType(Class clazz) {
-		//clazz.getName().equals(Object.class.getName())
-		return coreTypes.contains(clazz.getName());
-	}
-
-	private boolean isTransient(Field field) {
-		boolean isTransient = Modifier.isTransient(field.getModifiers()) || field.isAnnotationPresent(Transient.class);
-		return isTransient;
-	}
-
 	/**
+	 * Provides access to the index for an entity.
+	 * 
 	 * @param entity
+	 *            the type whose index we seek access to
 	 * @return the database index for the given entity's class
 	 */
 	public Index<Node> getNodeIndex(Class<?> aClass) {
 		Class<?> superClass = aClass;
-		while (superClass != null && !superClass.getName().equals(Object.class.getName())){
-			superClass = superClass.getSuperclass(); 
+		while (superClass != null && !superClass.getName().equals(Object.class.getName())) {
+			superClass = superClass.getSuperclass();
 		}
 		return database.index().forNodes(superClass.getName());
 	}
 
 	/**
-	 * Set properties or relationships for the given node based on the value type. if the value is a primitive, it will
-	 * creates a property for it. if the value is not primitive but has a converter, it will use the converter to create
-	 * the property. if the value is not primitive and doesn't have a converter it will create a relationship. if the
-	 * value is a collection, it will create a relationship for all its elements.
+	 * Set properties or relationships for the given node based on the value
+	 * type. if the value is a primitive, it will creates a property for it. if
+	 * the value is not primitive but has a converter, it will use the converter
+	 * to create the property. if the value is not primitive and doesn't have a
+	 * converter it will create a relationship. if the value is a collection, it
+	 * will create a relationship for all its elements.
 	 * 
 	 * @param node
 	 * @param name
 	 * @param value
 	 */
 	private void setProperty(Node node, final String name, Object value) {
-		if (value == null) {			
+		if (value == null) {
 			removeValueIfExists(node, name);
 			return; // we are not setting null values
 		}
@@ -173,21 +178,23 @@ public class EntityManager {
 		}
 
 	}
+
 	/**
 	 * index the given property in the given class
-	 * @param aClass 
+	 * 
+	 * @param aClass
 	 * @param node
 	 * @param name
 	 * @param value
 	 */
 	private void addIndex(Class<?> aClass, Node node, String name, Object value) {
-		if(node.hasProperty(name)){
+		if (node.hasProperty(name)) {
 			log.debug("update index for property with name '{}' and primitive type '{}'", name, value.getClass());
 			getNodeIndex(aClass).add(node, name, value);
 		}
 		return;
 	}
-	
+
 	/**
 	 * update the index value
 	 * 
@@ -197,21 +204,30 @@ public class EntityManager {
 	 * @param value
 	 */
 	private void updateIndex(Class<?> aClass, Node node, String name, Object value) {
-		if(node.hasProperty(name)){
+		if (node.hasProperty(name)) {
 			getNodeIndex(aClass).remove(node, name);
-			if(value != null){
+			if (value != null) {
 				getNodeIndex(aClass).add(node, name, value);
 			}
 		}
 	}
 
+	/**
+	 * Provides means of updating an entity whose properties have changed.
+	 * 
+	 * @param entity
+	 *            the new version of the entity
+	 * @param existingNode
+	 *            the node in the db where the current values are held
+	 * @return the updated node
+	 */
 	public Node update(Object entity, Node existingNode) {
 		Transaction transaction = database.beginTx();
 		for (Field field : entity.getClass().getDeclaredFields()) {
 			try {
 				field.setAccessible(true);
 				Object value = field.get(entity);
-				if(field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)){
+				if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
 					updateIndex(entity.getClass(), existingNode, field.getName(), value);
 				}
 
@@ -246,8 +262,9 @@ public class EntityManager {
 	}
 
 	/**
-	 * Create relationship from the given node, with a type has the given name. The end node will be the node for the
-	 * given value, if a node exists it will use it, if not it will create new node.
+	 * Create relationship from the given node, with a type has the given name.
+	 * The end node will be the node for the given value, if a node exists it
+	 * will use it, if not it will create new node.
 	 * 
 	 * @param node
 	 * @param name
@@ -266,10 +283,11 @@ public class EntityManager {
 	}
 
 	/**
-	 * Returns existing node for given entity, it will get the primary key of the entity and then load the entity from
-	 * the index using it.
+	 * Returns existing node for given entity, it will get the primary key of
+	 * the entity and then load the entity from the index using it.
 	 * 
-	 * If there is no primary key, or the index doesn't have the found primary key, method will return null
+	 * If there is no primary key, or the index doesn't have the found primary
+	 * key, method will return null
 	 * 
 	 * @param entity
 	 * @return
@@ -317,9 +335,14 @@ public class EntityManager {
 	}
 
 	/**
-	 * Create reference node with the given type
+	 * Provides means of making reference nodes, which are starting points into
+	 * areas of the graph.
 	 * 
 	 * @param type
+	 *            the type for which we would have a new starting point in the
+	 *            database
+	 * @see <a href="http://wiki.neo4j.org/content/Design_Guide">neo4j Design
+	 *      Doc</a>
 	 */
 	public void createReferenceNodeOfType(RelationshipType type) {
 		referenceNode = database.createNode();
@@ -327,15 +350,27 @@ public class EntityManager {
 	}
 
 	/**
-	 * create relationship between given nodes with the given type
+	 * Provides means of creating associations between nodes in the database.
 	 * 
 	 * @param fromNode
+	 *            where the relationship originates
 	 * @param toNode
+	 *            where the relation points to
 	 * @param type
+	 *            the type of relationship between these nodes, e.g. Parent or
+	 *            Uses, etc.
 	 */
 	public void createRelationship(Node fromNode, Node toNode, RelationshipType type) {
 		fromNode.createRelationshipTo(toNode, type);
 	}
 
+	private boolean isCoreType(Class<?> clazz) {
+		return coreTypes.contains(clazz.getName());
+	}
+
+	private boolean isTransient(Field field) {
+		boolean isTransient = Modifier.isTransient(field.getModifiers()) || field.isAnnotationPresent(Transient.class);
+		return isTransient;
+	}
 
 }

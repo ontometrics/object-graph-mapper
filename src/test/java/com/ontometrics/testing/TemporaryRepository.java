@@ -1,7 +1,6 @@
 package com.ontometrics.testing;
 
 import org.junit.rules.TemporaryFolder;
-import org.neo4j.graphdb.Transaction;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
