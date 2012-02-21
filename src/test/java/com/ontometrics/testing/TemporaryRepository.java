@@ -1,7 +1,7 @@
 package com.ontometrics.testing;
 
-import org.junit.Before;
 import org.junit.rules.TemporaryFolder;
+import org.neo4j.graphdb.Transaction;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,11 +25,15 @@ public class TemporaryRepository<T> extends TemporaryFolder {
 		emf.setRoot(getRoot());
 		log.debug("root: {}", getRoot());
 		entityManager = emf.getEntityManager("testdb");
-		database = new EmbeddedGraphDatabase(getRoot().getAbsolutePath());
 		log.debug("database: {}", database);
 		repository = new EntityRepository<T>();
 		repository.setEntityManager(entityManager);
 		log.debug("repository: {}", repository);
+	}
+	
+	@Override
+	protected void after() {
+		super.after();
 	}
 	
 	public EmbeddedGraphDatabase getDatabase() {
