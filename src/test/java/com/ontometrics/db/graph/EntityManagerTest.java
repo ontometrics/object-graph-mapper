@@ -21,6 +21,8 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
+import org.neo4j.graphdb.index.IndexHits;
+import org.neo4j.graphdb.index.ReadableRelationshipIndex;
 
 import com.ontometrics.db.graph.model.Employee;
 import com.ontometrics.testing.TestGraphDatabase;
@@ -118,6 +120,28 @@ public class EntityManagerTest {
 		indexedNode = entityManager.getNodeIndex(Person.class).get("birthDate", birthdate).getSingle();
 		assertThat(indexedNode, nullValue());
 
+	}
+
+	@Test
+	public void indexingRelationships(){
+		Person parent = new Person("williams", new DateTime().minusYears(50).toDate());
+		person.setParent(parent);
+		
+		Node personNode = entityManager.create(person);
+
+		Relationship parentRelationShip = personNode.getSingleRelationship(parentType, Direction.OUTGOING);
+
+		ReadableRelationshipIndex parentsIndex = (ReadableRelationshipIndex) entityManager.getRelationshipIndex(Person.class, "parent"); 
+		IndexHits<Relationship> relationships = parentsIndex.get( "child", username, personNode, null );
+		assertThat(relationships.hasNext(), is(true));
+		assertThat(relationships.next(), is(parentRelationShip));
+		
+		
+		person.setParent(null);
+		entityManager.update(person, personNode);		
+		relationships = parentsIndex.get( "child", username, personNode, null );
+		assertThat(relationships.hasNext(), is(false));
+		
 	}
 
 	@Test

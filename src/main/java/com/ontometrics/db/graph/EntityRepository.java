@@ -12,7 +12,7 @@ public class EntityRepository<T> {
 
 	private Logger log = LoggerFactory.getLogger(EntityRepository.class);
 
-	private EntityManager entityManager;
+	protected EntityManager entityManager;
 
 	public Node create(T entity) {
 		return entityManager.create(entity);

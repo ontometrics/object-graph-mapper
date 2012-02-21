@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 
 import javax.persistence.Id;
@@ -84,32 +85,36 @@ public class EntityManager {
 		Transaction transaction = database.beginTx();
 		try {
 			Node node = database.createNode();
-			Class clazz = entity.getClass();
+			Class<?> clazz = entity.getClass();
 			while (clazz != null && !isCoreType(clazz)) {
 				log.debug("processing class: {}", clazz);
 				for (Field field : clazz.getDeclaredFields()) {
 					field.setAccessible(true);
 					if (!isTransient(field)) {
-						Object value = null;
-						try {
-							value = field.get(entity);
-						} catch (IllegalArgumentException e) {
-							log.error("Error getting the field value from " + entity, e);
-							continue;
-						} catch (IllegalAccessException e) {
-							log.error("Error getting the field value from " + entity, e);
-							continue;
+						Object value = getFieldValue(entity, field);
+						if (value == null) {
+							if (isThePrimaryKey(field)) {
+								throw new IllegalArgumentException("Primary key cannot be null");
+							} else {
+								continue;
+							}
 						}
 						setProperty(node, field.getName(), value);
-						if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class) && value != null) {
-							addIndex(entity.getClass(), node, field.getName(), value);
+						//index the entity using the key/value in the index annotation
+						if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
+							String indexKey = field.getAnnotation(com.ontometrics.db.graph.Index.class).key();
+							String indexValueName = field.getAnnotation(com.ontometrics.db.graph.Index.class).value();
+							Object indexValue = null;
+							if (indexKey.equals("n/a")) {
+								indexKey = field.getName();
+							}
+							if (!indexValueName.equals("n/a")) {
+								indexValue = getFieldValue(entity, getFieldWithName(entity, indexValueName));
+							}
+							addIndex(entity.getClass(), node, field.getName(), value, indexKey, indexValue);
 						}
 						if (isThePrimaryKey(field)) {
-							if (value != null) {
-								getNodeIndex(entity.getClass()).add(node, PRIMARY_KEY, value);
-							} else {
-								throw new IllegalArgumentException("Primary key cannot be null");
-							}
+							getNodeIndex(entity.getClass()).add(node, PRIMARY_KEY, value);
 						}
 					}
 				}
@@ -126,7 +131,59 @@ public class EntityManager {
 	 * Provides access to the index for an entity.
 	 * 
 	 * @param entity
-	 *            the type whose index we seek access to
+	 * @param name
+	 * @return field with the given name in the given entity
+	 */
+	private Field getFieldWithName(Object entity, String name) {
+		Class<?> clazz = entity.getClass();
+		while (clazz != null && !coreType(clazz)) {
+			log.debug("processing class: {}", clazz);
+			Field field = null;
+			try {
+				field = clazz.getDeclaredField(name);
+			} catch (SecurityException e) {
+			} catch (NoSuchFieldException e) {
+			}
+			if (field != null) {
+				return field;
+			}
+			clazz = clazz.getSuperclass();
+		}
+		return null;
+	}
+
+	/**
+	 * return the value of the given field in the given entity
+	 * 
+	 * @param entity
+	 * @param field
+	 * @return
+	 */
+	private Object getFieldValue(Object entity, Field field) {
+		Object value = null;
+		try {
+			field.setAccessible(true);
+			value = field.get(entity);
+		} catch (IllegalArgumentException e) {
+			log.error("Error getting the field value from " + entity, e);
+		} catch (IllegalAccessException e) {
+			log.error("Error getting the field value from " + entity, e);
+		}
+		return value;
+	}
+
+	private boolean coreType(Class<?> clazz) {
+		// clazz.getName().equals(Object.class.getName())
+		return coreTypes.contains(clazz.getName());
+	}
+
+	private boolean isTransient(Field field) {
+		boolean isTransient = Modifier.isTransient(field.getModifiers()) || field.isAnnotationPresent(Transient.class);
+		return isTransient;
+	}
+
+	/**
+	 * @param entity
 	 * @return the database index for the given entity's class
 	 */
 	public Index<Node> getNodeIndex(Class<?> aClass) {
@@ -135,6 +192,14 @@ public class EntityManager {
 			superClass = superClass.getSuperclass();
 		}
 		return database.index().forNodes(superClass.getName());
+	}
+
+	public Index<Relationship> getRelationshipIndex(Class<?> aClass, String name) {
+		Class<?> superClass = aClass;
+		while (superClass != null && !superClass.getName().equals(Object.class.getName())) {
+			superClass = superClass.getSuperclass();
+		}
+		return database.index().forRelationships(superClass.getName() + "." + name);
 	}
 
 	/**
@@ -186,11 +251,19 @@ public class EntityManager {
 	 * @param node
 	 * @param name
 	 * @param value
+	 * @param indexValue
+	 * @param indexKey
 	 */
-	private void addIndex(Class<?> aClass, Node node, String name, Object value) {
+	private void addIndex(Class<?> aClass, Node node, String name, Object value, String indexKey, Object indexValue) {
 		if (node.hasProperty(name)) {
 			log.debug("update index for property with name '{}' and primitive type '{}'", name, value.getClass());
-			getNodeIndex(aClass).add(node, name, value);
+			getNodeIndex(aClass).add(node, indexKey, value);
+		} else {
+
+			Iterator<Relationship> iterator = node.getRelationships(DynamicRelationshipType.withName(name)).iterator();
+			while (iterator.hasNext()) {
+				getRelationshipIndex(aClass, name).add(iterator.next(), indexKey, indexValue);
+			}
 		}
 		return;
 	}
@@ -208,6 +281,15 @@ public class EntityManager {
 			getNodeIndex(aClass).remove(node, name);
 			if (value != null) {
 				getNodeIndex(aClass).add(node, name, value);
+			}
+		} else {
+			if (value == null) {
+				// TODO check back for collections
+				Iterator<Relationship> iterator = node.getRelationships(DynamicRelationshipType.withName(name))
+						.iterator();
+				while (iterator.hasNext()) {
+					getRelationshipIndex(aClass, name).remove(iterator.next());
+				}
 			}
 		}
 	}
@@ -248,14 +330,10 @@ public class EntityManager {
 		if (node.hasProperty(name)) {
 			node.removeProperty(name);
 		} else {
-			Relationship relationship = node.getSingleRelationship(new RelationshipType() {
-
-				public String name() {
-					return name;
-				}
-			}, Direction.OUTGOING);
-			if (relationship != null) {
-				relationship.delete();
+			Iterator<Relationship> iterator = node.getRelationships(Direction.OUTGOING,
+					DynamicRelationshipType.withName(name)).iterator();
+			while (iterator.hasNext()) {
+				iterator.next().delete();
 			}
 		}
 

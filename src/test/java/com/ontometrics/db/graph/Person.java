@@ -18,7 +18,7 @@ public class Person {
 
 	private Address address;
 
-	@Index
+	@Index(key = "child", value = "name")
 	private Person parent;
 
 	private Set<Person> friends = new HashSet<Person>();
