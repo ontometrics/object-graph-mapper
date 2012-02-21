@@ -46,8 +46,8 @@ public class EntityManager {
 	private EmbeddedGraphDatabase database;
 
 	/**
-	 * Passed in on creation. This just wraps itself around the database and
-	 * offers basic help with CRUD support for corresponding repositories.
+	 * Passed in on creation. This just wraps itself around the database and offers basic help with CRUD support for
+	 * corresponding repositories.
 	 * 
 	 * @param database
 	 *            the database we will be using in this session
