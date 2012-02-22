@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import com.ontometrics.db.graph.conversion.TypeConverter;
 import com.ontometrics.db.graph.conversion.TypeRegistry;
+import com.ontometrics.utils.ArrayUtils;
 
 public class GraphDBEntityBuilder {
 
@@ -47,8 +48,7 @@ public class GraphDBEntityBuilder {
 				Field field = getField(entity.getClass(), key);
 				field.setAccessible(true);
 				log.debug("setting field: {} of type {}", field, field.getType());
-				Object value = getPropertyValue(node, key, field.getType());
-				field.set(entity, value);
+				setFieldValue(node.getProperty(key), entity, field);
 			} catch (Exception e) {
 				log.error("error building entity: " + entity, e);
 			}
@@ -138,23 +138,40 @@ public class GraphDBEntityBuilder {
 	}
 
 	/**
-	 * Returns the property value associated with the given key. The method uses
-	 * a converter if the type is not a primitive.
+	 * Set the field with the property value. 
+	 * The method uses a converter if the type is not a primitive.
+	 * Or convert array property to a collection before saving.
+	 * Or just set the field, if the type is primitive.
 	 * 
 	 * @param node
 	 * @param key
 	 * @param type
 	 * @return
+	 * @throws IllegalAccessException 
+	 * @throws IllegalArgumentException 
+	 * @throws InstantiationException 
 	 */
-	private static Object getPropertyValue(Node node, String key, Class<?> type) {
+	@SuppressWarnings("unchecked")
+	private static void setFieldValue(Object property, Object entity, Field field) throws IllegalArgumentException, IllegalAccessException, InstantiationException {
+		Class<?> type = field.getType();
 		TypeConverter converter = TypeRegistry.getConverter(type);
 		if (converter != null) {
 			log.debug("get property with name {} and type {} using converter {}",
-					new Object[] { key, type, converter.getClass() });
-			Object value = converter.convertFromPrimitive(node.getProperty(key));
-			return value;
+					new Object[] { field.getName(), type, converter.getClass() });
+			Object value = converter.convertFromPrimitive(property);
+			field.set(entity, value);
+			return;
 		}
+		
+		if(property.getClass().isArray()){
+			log.debug("get property with name {} and type array", field.getName());
+			Collection<Object> collection = (Collection<Object>) newInstanceOfCollection(field.getType());
+			collection.addAll(ArrayUtils.toCollection(property));
+			field.set(entity, collection);
+			return;
+		}
+		
 		// if doesn't have a converter then it is primitive
-		return node.getProperty(key);
+		field.set(entity, property);
 	}
 }
