@@ -19,8 +19,8 @@ public class EntityRepository<T> {
 	}
 
 	public T read(Class<T> entityClass, Object primaryKey) throws IllegalArgumentException {
-		Index<Node> index = entityManager.getDatabase().index().forNodes(entityClass.getName());
-		Node node = index.get(GraphDBEntityBuilder.PRIMARY_KEY, primaryKey).getSingle();
+		Index<Node> index = entityManager.getNodeIndex(entityClass);
+		Node node = index.get(EntityManager.PRIMARY_KEY, primaryKey).getSingle();
 		if (node == null) {
 			throw new IllegalArgumentException("No node found with key " + primaryKey);
 		}
@@ -34,20 +34,24 @@ public class EntityRepository<T> {
 		return entity;
 	}
 
-	public void update(T entityClass, Object primaryKey) {
+	public void update(T entity, Object primaryKey) {
 		// TODO: this should be: entityManager.update(), then we'd have one tx.
 		Transaction transaction = entityManager.getDatabase().beginTx();
-		Index<Node> index = entityManager.getDatabase().index().forNodes(entityClass.getClass().getName());
-		Node node = index.get(GraphDBEntityBuilder.PRIMARY_KEY, primaryKey).getSingle();
-		entityManager.update(entityClass, node);
+		Index<Node> index = entityManager.getNodeIndex(entity.getClass());
+		Node node = index.get(EntityManager.PRIMARY_KEY, primaryKey).getSingle();
+		if(node == null){
+			throw new IllegalArgumentException(MessageFormat.format(
+					"No node exists for class {0} with primary key {1}", entity, primaryKey));
+		}
+		entityManager.update(entity, node);
 		transaction.success();
 		transaction.finish();
 	}
 
-	public void destroy(T entityClass, Object primaryKey) {
+	public void destroy(T entity, Object primaryKey) {
 		Transaction transaction = entityManager.getDatabase().beginTx();
-		Index<Node> index = entityManager.getDatabase().index().forNodes(entityClass.getClass().getName());
-		Node node = index.get(GraphDBEntityBuilder.PRIMARY_KEY, primaryKey).getSingle();
+		Index<Node> index = entityManager.getNodeIndex(entity.getClass());
+		Node node = index.get(EntityManager.PRIMARY_KEY, primaryKey).getSingle();
 		node.delete();
 		transaction.success();
 		transaction.finish();
