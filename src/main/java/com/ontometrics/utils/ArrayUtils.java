@@ -1,5 +1,6 @@
 package com.ontometrics.utils;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -13,7 +14,7 @@ public class ArrayUtils {
 	 * @param collection
 	 */
 	public static Object toPrimitives(Collection<Object> collection) {
-		if(collection == null) return null;
+		if(collection == null || collection.isEmpty()) return null;
 		List<Object> value = new ArrayList<Object>(collection);
 		Object firstObject = value.get(0);
 		
@@ -108,5 +109,13 @@ public class ArrayUtils {
 		}
 
 		return null;
+	}
+
+	public static Collection<Object> toCollection(Object property) {
+		List<Object> objects = new ArrayList<Object>();
+		for(int i = 0; i < Array.getLength(property); i++){
+			objects.add(Array.get(property, i));
+		}
+		return objects;
 	}
 }

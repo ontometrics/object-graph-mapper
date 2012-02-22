@@ -225,7 +225,7 @@ public class EntityManager {
 		if (Collection.class.isAssignableFrom(value.getClass())) {
 			@SuppressWarnings("unchecked")
 			Collection<Object> collection = (Collection<Object>) value;
-			if(isCollectionOfPrimitives(collection)){
+			if(isCollectionOfPrimitives(collection) && !collection.isEmpty()){
 				node.setProperty(name, ArrayUtils.toPrimitives(collection));
 			}else{
 				
