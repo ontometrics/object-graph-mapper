@@ -25,8 +25,6 @@ public class GraphDBEntityBuilder {
 
 	private static final Logger log = LoggerFactory.getLogger(GraphDBEntityBuilder.class);
 
-	public static final String PRIMARY_KEY = "PrimarykeyIndex";
-
 	// the map is to hold created entities to use it to avoid circular
 	// references
 	private Map<Node, Object> entitiesMap = new HashMap<Node, Object>();
