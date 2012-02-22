@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import com.ontometrics.db.graph.conversion.TypeConverter;
 import com.ontometrics.db.graph.conversion.TypeRegistry;
+import com.ontometrics.utils.ArrayUtils;
 
 /**
  * Means of getting access to a specific database.
@@ -80,7 +81,6 @@ public class EntityManager {
 	 *            database
 	 * @return the node that was built
 	 */
-	@SuppressWarnings("rawtypes")
 	public Node create(Object entity) {
 		Transaction transaction = database.beginTx();
 		try {
@@ -225,13 +225,32 @@ public class EntityManager {
 		if (Collection.class.isAssignableFrom(value.getClass())) {
 			@SuppressWarnings("unchecked")
 			Collection<Object> collection = (Collection<Object>) value;
-			for (Object object : collection) {
-				createRelationship(node, name, object);
+			if(isCollectionOfPrimitives(collection)){
+				node.setProperty(name, ArrayUtils.toPrimitives(collection));
+			}else{
+				
+				for (Object object : collection) {
+					createRelationship(node, name, object);
+				}
 			}
 		} else {
 			createRelationship(node, name, value);
 		}
 
+	}
+
+	/**
+	 * 
+	 * @param collection
+	 * @return true if all objects in the collection are of primitive types
+	 */
+	private boolean isCollectionOfPrimitives(Collection<Object> collection) {
+		for(Object object : collection){
+			if(!isPrimitiveType(object)){
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
