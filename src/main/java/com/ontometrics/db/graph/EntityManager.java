@@ -136,7 +136,7 @@ public class EntityManager {
 	 */
 	private Field getFieldWithName(Object entity, String name) {
 		Class<?> clazz = entity.getClass();
-		while (clazz != null && !coreType(clazz)) {
+		while (clazz != null && !isCoreType(clazz)) {
 			log.debug("processing class: {}", clazz);
 			Field field = null;
 			try {
@@ -170,16 +170,6 @@ public class EntityManager {
 			log.error("Error getting the field value from " + entity, e);
 		}
 		return value;
-	}
-
-	private boolean coreType(Class<?> clazz) {
-		// clazz.getName().equals(Object.class.getName())
-		return coreTypes.contains(clazz.getName());
-	}
-
-	private boolean isTransient(Field field) {
-		boolean isTransient = Modifier.isTransient(field.getModifiers()) || field.isAnnotationPresent(Transient.class);
-		return isTransient;
 	}
 
 	/**
