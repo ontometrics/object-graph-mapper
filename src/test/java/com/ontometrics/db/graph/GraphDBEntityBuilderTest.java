@@ -17,9 +17,10 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.RelationshipType;
 
+import com.ontometrics.db.graph.model.AddressBook;
 import com.ontometrics.db.graph.model.Employee;
 import com.ontometrics.testing.TestGraphDatabase;
 
@@ -38,7 +39,7 @@ public class GraphDBEntityBuilderTest {
 	private Date hireDate = new DateTime().minusYears(3).toDate();
 	@Rule
 	public TemporaryFolder dbFolder = new TemporaryFolder();
-	
+
 	@Rule
 	public TestGraphDatabase database = new TestGraphDatabase(dbFolder);
 
@@ -47,11 +48,11 @@ public class GraphDBEntityBuilderTest {
 	private String country = "US";
 	private Node personNode, friend1Node, friend2Node;
 	private Node addressNode;
-	
+
 	private String employeeDepartmentName = "Engineering";
 
 	@Before
-	public void setup(){
+	public void setup() {
 		personNode = database.getDatabase().createNode();
 		personNode.setProperty("name", username);
 		personNode.setProperty("birthDate", birthdate.getTime());
@@ -65,12 +66,12 @@ public class GraphDBEntityBuilderTest {
 		friend2Node.setProperty("birthDate", birthdate.getTime());
 
 		addressNode = database.getDatabase().createNode();
-		addressNode.setProperty("city", city );
+		addressNode.setProperty("city", city);
 		addressNode.setProperty("country", country);
 		addressNode.setProperty("name", addressName);
-		
+
 	}
-	
+
 	@Test
 	public void buildEntity() {
 
@@ -83,28 +84,18 @@ public class GraphDBEntityBuilderTest {
 		assertThat(person.getBirthDate(), is(birthdate));
 
 	}
-	
+
 	@Test
-	public void buildEntityWithRelationships(){
-		
-		personNode.createRelationshipTo(addressNode, new RelationshipType() {
-			
-			public String name() {
-				return "address";
-			}
-		});
-		//check circular references
-		addressNode.createRelationshipTo(personNode, new RelationshipType() {
-			
-			public String name() {
-				return "owner";
-			}
-		});
-		
-		//reverse from node to entity
+	public void buildEntityWithRelationships() {
+
+		personNode.createRelationshipTo(addressNode, DynamicRelationshipType.withName("address"));
+		// check circular references
+		addressNode.createRelationshipTo(personNode, DynamicRelationshipType.withName("owner"));
+
+		// reverse from node to entity
 		Person person = new Person();
 		GraphDBEntityBuilder.buildEntity(personNode, person);
-		
+
 		assertThat(person.getName(), is(username));
 		assertThat(person.getAddress(), notNullValue());
 		assertThat(person.getAddress().getName(), is(addressName));
@@ -112,36 +103,19 @@ public class GraphDBEntityBuilderTest {
 		assertThat(person.getAddress().getCountry(), is(country));
 
 	}
-	
+
 	@Test
-	public void buildEntityWithCollections(){
-		personNode.createRelationshipTo(friend1Node, new RelationshipType() {
-			
-			public String name() {
-				return "friends";
-			}
-		});
-
-		personNode.createRelationshipTo(friend2Node, new RelationshipType() {
-			
-			public String name() {
-				return "friends";
-			}
-		});
-
-		friend1Node.createRelationshipTo(friend2Node, new RelationshipType() {
-			
-			public String name() {
-				return "friends";
-			}
-		});
+	public void buildEntityWithCollections() {
+		personNode.createRelationshipTo(friend1Node, DynamicRelationshipType.withName("friends"));
+		personNode.createRelationshipTo(friend2Node, DynamicRelationshipType.withName("friends"));
+		friend1Node.createRelationshipTo(friend2Node, DynamicRelationshipType.withName("friends"));
 
 		Person person = new Person();
 		GraphDBEntityBuilder.buildEntity(personNode, person);
 		assertThat(person.getFriends(), notNullValue());
 		assertThat(person.getFriends().size(), is(2));
 		Set<String> names = new HashSet<String>();
-		for(Person friend : person.getFriends()){
+		for (Person friend : person.getFriends()) {
 			names.add(friend.getName());
 		}
 		assertThat(names, hasItem("Jan"));
@@ -153,6 +127,49 @@ public class GraphDBEntityBuilderTest {
 		assertThat(friend1.getFriends().size(), is(1));
 		assertThat(friend1.getFriends().iterator().next().getName(), is("Jan"));
 	}
+
+	@Test
+	public void buildEntityWithMap() {
+
+		Node mapEntry1 = database.getDatabase().createNode();
+		mapEntry1.setProperty("value", "12345678");
+
+		Node mapEntry1key = database.getDatabase().createNode();
+		mapEntry1.createRelationshipTo(mapEntry1key, DynamicRelationshipType.withName("key"));
+		mapEntry1key.setProperty("name", "Rob");
+
+		Node mapEntry2 = database.getDatabase().createNode();
+		mapEntry2.setProperty("value", "012345678");
+
+		Node mapEntry2key = database.getDatabase().createNode();
+		mapEntry2.createRelationshipTo(mapEntry2key, DynamicRelationshipType.withName("key"));
+		mapEntry2key.setProperty("name", "Joe");
+
+		Node mapEntry3 = database.getDatabase().createNode();
+		mapEntry3.setProperty("value", "43256666");
+
+		Node mapEntry3key = database.getDatabase().createNode();
+		mapEntry3.createRelationshipTo(mapEntry3key, DynamicRelationshipType.withName("key"));
+		mapEntry3key.setProperty("name", "Ann");
+
+		Node node = database.getDatabase().createNode();
+		node.createRelationshipTo(mapEntry1, DynamicRelationshipType.withName("phones"));
+		node.createRelationshipTo(mapEntry2, DynamicRelationshipType.withName("phones"));
+		node.createRelationshipTo(mapEntry3, DynamicRelationshipType.withName("phones"));
+
+		AddressBook addressBook = new AddressBook();
+		GraphDBEntityBuilder.buildEntity(node, addressBook);
+		assertThat(addressBook.getPhones(), notNullValue());
+		assertThat(addressBook.getPhones().size(), is(3));
+		assertThat(addressBook.getPhones().containsValue("12345678"), is(true));
+		assertThat(addressBook.getPhones().containsValue("012345678"), is(true));
+		assertThat(addressBook.getPhones().containsValue("43256666"), is(true));
+		assertThat(addressBook.getPhones().keySet().contains(new Person("Rob")), is(true));
+		assertThat(addressBook.getPhones().keySet().contains(new Person("Joe")), is(true));
+		assertThat(addressBook.getPhones().keySet().contains(new Person("Ann")), is(true));
+
+	}
+
 	@Test
 	public void superClassPropertiesAreDiscovered() {
 		Node employeeNode = database.getDatabase().createNode();
@@ -160,7 +177,7 @@ public class GraphDBEntityBuilderTest {
 		employeeNode.setProperty("birthDate", birthdate.getTime());
 		employeeNode.setProperty("hireDate", hireDate.getTime());
 		employeeNode.setProperty("departmentName", employeeDepartmentName);
-		
+
 		Employee employee = new Employee();
 
 		GraphDBEntityBuilder.buildEntity(employeeNode, employee);
