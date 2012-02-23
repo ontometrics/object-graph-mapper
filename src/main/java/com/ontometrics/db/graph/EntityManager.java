@@ -34,6 +34,8 @@ import com.ontometrics.utils.ArrayUtils;
  */
 public class EntityManager {
 
+	public static final String TYPE_PROPERTY = "_class";
+
 	private static final Logger log = LoggerFactory.getLogger(EntityManager.class);
 
 	public static final String PRIMARY_KEY = "PrimarykeyIndex";
@@ -261,7 +263,8 @@ public class EntityManager {
 			Node entryNode = database.createNode();
 			setProperty(entryNode, "key", key);
 			setProperty(entryNode, "value", map.get(key));
-			node.createRelationshipTo(entryNode, DynamicRelationshipType.withName(name));
+			Relationship relationship = node.createRelationshipTo(entryNode, DynamicRelationshipType.withName(name));
+			relationship.setProperty(TYPE_PROPERTY, map.get(key).getClass().getName());
 		}
 	}
 
@@ -391,7 +394,8 @@ public class EntityManager {
 		} else {
 			log.debug("found existing node for the relationship '{}'", name);
 		}
-		node.createRelationshipTo(toNode, DynamicRelationshipType.withName(name));
+		Relationship relationship = node.createRelationshipTo(toNode, DynamicRelationshipType.withName(name));
+		relationship.setProperty(TYPE_PROPERTY, value.getClass().getName());
 
 	}
 

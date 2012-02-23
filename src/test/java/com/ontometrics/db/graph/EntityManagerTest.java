@@ -200,7 +200,7 @@ public class EntityManagerTest {
 	public void createEntityWithMap() {
 		Map<Person, String> phones = new HashMap<Person, String>();
 		phones.put(person, "12345678");
-		phones.put(new Person("Joe"), "012345678");
+		phones.put(new Employee("Joe"), "012345678");
 		phones.put(new Person("Ann"), "43256666");
 		
 		Node node = entityManager.create(new AddressBook(phones));
@@ -212,27 +212,55 @@ public class EntityManagerTest {
 			assertThat(iterator.hasNext(), is(true));
 			Relationship relationship = iterator.next();
 			Node endNode = relationship.getEndNode();	
-			//since value is primitive, it is saved as a property, while the key is not primitive then it is saved as relationshipt
+			//since value is primitive, it is saved as a property, while the key is not primitive then it is saved as relationship
 			assertThat(endNode.hasRelationship(Direction.OUTGOING, DynamicRelationshipType.withName("key")), is(true));
 			assertThat(endNode.hasProperty("value"), is(true));
 			String value = (String) endNode.getProperty("value");
 			if(value.equals("12345678")){
-				Node personNode = endNode.getSingleRelationship(DynamicRelationshipType.withName("key"), Direction.OUTGOING).getEndNode();
+				Relationship _relationship = endNode.getSingleRelationship(DynamicRelationshipType.withName("key"), Direction.OUTGOING);
+				assertThat(_relationship.hasProperty(EntityManager.TYPE_PROPERTY), is(true));
+				assertThat((String) _relationship.getProperty(EntityManager.TYPE_PROPERTY), is(Person.class.getName()));
+				Node personNode = _relationship.getEndNode();
 				assertThat(personNode.hasProperty("name"), is(true));
 				assertThat((String) personNode.getProperty("name"), is(username));
 			}
 			if(value.equals("012345678")){
-				Node personNode = endNode.getSingleRelationship(DynamicRelationshipType.withName("key"), Direction.OUTGOING).getEndNode();
+				Relationship _relationship = endNode.getSingleRelationship(DynamicRelationshipType.withName("key"), Direction.OUTGOING);
+				assertThat(_relationship.hasProperty(EntityManager.TYPE_PROPERTY), is(true));
+				assertThat((String) _relationship.getProperty(EntityManager.TYPE_PROPERTY), is(Employee.class.getName()));
+				Node personNode = _relationship.getEndNode();
 				assertThat(personNode.hasProperty("name"), is(true));
 				assertThat((String) personNode.getProperty("name"), is("Joe"));
 			}
 			if(value.equals("43256666")){
-				Node personNode = endNode.getSingleRelationship(DynamicRelationshipType.withName("key"), Direction.OUTGOING).getEndNode();
+				Relationship _relationship = endNode.getSingleRelationship(DynamicRelationshipType.withName("key"), Direction.OUTGOING);
+				assertThat(_relationship.hasProperty(EntityManager.TYPE_PROPERTY), is(true));
+				assertThat((String) _relationship.getProperty(EntityManager.TYPE_PROPERTY), is(Person.class.getName()));
+				Node personNode = _relationship.getEndNode();
 				assertThat(personNode.hasProperty("name"), is(true));
 				assertThat((String) personNode.getProperty("name"), is("Ann"));
 			}
 
 		}		
+	}
+
+	@Test
+	public void createNodeForEntityWithSubclasses() {
+		Address address = new Address("home", "LA", "US");
+		address.setOwner(new Person("Ann"));
+		
+		Node node = entityManager.create(address);
+		Relationship relationship = node.getSingleRelationship(DynamicRelationshipType.withName("owner"), Direction.OUTGOING);
+		assertThat(relationship.hasProperty(EntityManager.TYPE_PROPERTY), is(true));
+		assertThat((String) relationship.getProperty(EntityManager.TYPE_PROPERTY), is(Person.class.getName()));
+		
+		address = new Address("Office", "LA", "US");
+		address.setOwner(new Employee("Joe"));
+		
+		node = entityManager.create(address);
+		relationship = node.getSingleRelationship(DynamicRelationshipType.withName("owner"), Direction.OUTGOING);
+		assertThat(relationship.hasProperty(EntityManager.TYPE_PROPERTY), is(true));
+		assertThat((String) relationship.getProperty(EntityManager.TYPE_PROPERTY), is(Employee.class.getName()));		
 	}
 
 	@Test
