@@ -9,6 +9,7 @@ import org.junit.Test;
 import org.neo4j.graphdb.Node;
 
 import com.ontometrics.db.graph.Person;
+import com.ontometrics.util.TemporaryRepository;
 
 public class TemporaryRepositoryTest {
 
