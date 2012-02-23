@@ -8,8 +8,10 @@ import static org.hamcrest.Matchers.nullValue;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.joda.time.DateTime;
 import org.junit.Before;
@@ -17,6 +19,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.neo4j.graphdb.Direction;
+import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.Relationship;
@@ -24,6 +27,7 @@ import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.index.IndexHits;
 import org.neo4j.graphdb.index.ReadableRelationshipIndex;
 
+import com.ontometrics.db.graph.model.AddressBook;
 import com.ontometrics.db.graph.model.Employee;
 import com.ontometrics.testing.TestGraphDatabase;
 
@@ -193,6 +197,45 @@ public class EntityManagerTest {
 	}
 
 	@Test
+	public void createEntityWithMap() {
+		Map<Person, String> phones = new HashMap<Person, String>();
+		phones.put(person, "12345678");
+		phones.put(new Person("Joe"), "012345678");
+		phones.put(new Person("Ann"), "43256666");
+		
+		Node node = entityManager.create(new AddressBook(phones));
+		
+		assertThat(node.hasRelationship(), is(true));
+		Iterator<Relationship> iterator = node.getRelationships(Direction.OUTGOING,
+				DynamicRelationshipType.withName("phones")).iterator();
+		for(int i = 0; i < phones.size(); i++){
+			assertThat(iterator.hasNext(), is(true));
+			Relationship relationship = iterator.next();
+			Node endNode = relationship.getEndNode();	
+			//since value is primitive, it is saved as a property, while the key is not primitive then it is saved as relationshipt
+			assertThat(endNode.hasRelationship(Direction.OUTGOING, DynamicRelationshipType.withName("key")), is(true));
+			assertThat(endNode.hasProperty("value"), is(true));
+			String value = (String) endNode.getProperty("value");
+			if(value.equals("12345678")){
+				Node personNode = endNode.getSingleRelationship(DynamicRelationshipType.withName("key"), Direction.OUTGOING).getEndNode();
+				assertThat(personNode.hasProperty("name"), is(true));
+				assertThat((String) personNode.getProperty("name"), is(username));
+			}
+			if(value.equals("012345678")){
+				Node personNode = endNode.getSingleRelationship(DynamicRelationshipType.withName("key"), Direction.OUTGOING).getEndNode();
+				assertThat(personNode.hasProperty("name"), is(true));
+				assertThat((String) personNode.getProperty("name"), is("Joe"));
+			}
+			if(value.equals("43256666")){
+				Node personNode = endNode.getSingleRelationship(DynamicRelationshipType.withName("key"), Direction.OUTGOING).getEndNode();
+				assertThat(personNode.hasProperty("name"), is(true));
+				assertThat((String) personNode.getProperty("name"), is("Ann"));
+			}
+
+		}		
+	}
+
+	@Test
 	public void updateNullValueWilRemoveIt(){
 		person.setAddress(new Address(addressName, city, country));
 		Node personNode = entityManager.create(person);
@@ -246,5 +289,4 @@ public class EntityManagerTest {
 		assertThat((String)node.getProperty("name"), is("neo4j"));
 		
 	}
-
 }
