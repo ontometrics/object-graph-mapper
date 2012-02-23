@@ -19,6 +19,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.Relationship;
 
 import com.ontometrics.db.graph.model.AddressBook;
 import com.ontometrics.db.graph.model.Employee;
@@ -133,25 +134,30 @@ public class GraphDBEntityBuilderTest {
 
 		Node mapEntry1 = database.getDatabase().createNode();
 		mapEntry1.setProperty("value", "12345678");
-
+		
 		Node mapEntry1key = database.getDatabase().createNode();
-		mapEntry1.createRelationshipTo(mapEntry1key, DynamicRelationshipType.withName("key"));
+		Relationship relationship = mapEntry1.createRelationshipTo(mapEntry1key, DynamicRelationshipType.withName("key"));
+		relationship.setProperty(EntityManager.TYPE_PROPERTY, Person.class.getName());
 		mapEntry1key.setProperty("name", "Rob");
 
 		Node mapEntry2 = database.getDatabase().createNode();
 		mapEntry2.setProperty("value", "012345678");
-
+		
 		Node mapEntry2key = database.getDatabase().createNode();
-		mapEntry2.createRelationshipTo(mapEntry2key, DynamicRelationshipType.withName("key"));
+		relationship = mapEntry2.createRelationshipTo(mapEntry2key, DynamicRelationshipType.withName("key"));
+		relationship.setProperty(EntityManager.TYPE_PROPERTY, Employee.class.getName());
 		mapEntry2key.setProperty("name", "Joe");
 
 		Node mapEntry3 = database.getDatabase().createNode();
 		mapEntry3.setProperty("value", "43256666");
-
+		mapEntry3.setProperty("_class", Person.class.getName());
+		
 		Node mapEntry3key = database.getDatabase().createNode();
-		mapEntry3.createRelationshipTo(mapEntry3key, DynamicRelationshipType.withName("key"));
+		relationship = mapEntry3.createRelationshipTo(mapEntry3key, DynamicRelationshipType.withName("key"));
+		relationship.setProperty(EntityManager.TYPE_PROPERTY, Person.class.getName());
 		mapEntry3key.setProperty("name", "Ann");
-
+		
+		
 		Node node = database.getDatabase().createNode();
 		node.createRelationshipTo(mapEntry1, DynamicRelationshipType.withName("phones"));
 		node.createRelationshipTo(mapEntry2, DynamicRelationshipType.withName("phones"));
@@ -165,9 +171,45 @@ public class GraphDBEntityBuilderTest {
 		assertThat(addressBook.getPhones().containsValue("012345678"), is(true));
 		assertThat(addressBook.getPhones().containsValue("43256666"), is(true));
 		assertThat(addressBook.getPhones().keySet().contains(new Person("Rob")), is(true));
-		assertThat(addressBook.getPhones().keySet().contains(new Person("Joe")), is(true));
+		assertThat(addressBook.getPhones().keySet().contains(new Employee("Joe")), is(true));
 		assertThat(addressBook.getPhones().keySet().contains(new Person("Ann")), is(true));
 
+	}
+	
+	@Test
+	public void buildEntityWithSubclasses() {
+		Node node = database.getDatabase().createNode();
+		node.setProperty("name", "home");
+		
+		Node personNode = database.getDatabase().createNode();
+		personNode.setProperty("name", "Ann");
+		
+		Relationship relationship = node.createRelationshipTo(personNode, DynamicRelationshipType.withName("owner"));
+		relationship.setProperty(EntityManager.TYPE_PROPERTY, Person.class.getName());
+		
+		Address address = new Address();
+		GraphDBEntityBuilder.buildEntity(node, address);
+		assertThat(address.getName(), is("home"));
+		assertThat(address.getOwner(), notNullValue());
+		assertThat(address.getOwner().getName(), is("Ann"));
+		
+		node = database.getDatabase().createNode();
+		node.setProperty("name", "Office");
+		
+		personNode = database.getDatabase().createNode();
+		personNode.setProperty("name", "Joe");
+		
+		relationship = node.createRelationshipTo(personNode, DynamicRelationshipType.withName("owner"));
+		relationship.setProperty(EntityManager.TYPE_PROPERTY, Employee.class.getName());
+		
+		address = new Address();
+		GraphDBEntityBuilder.buildEntity(node, address);
+		assertThat(address.getName(), is("Office"));
+		assertThat(address.getOwner(), notNullValue());
+		assertThat(address.getOwner().getName(), is("Joe"));
+		
+		
+		
 	}
 
 	@Test

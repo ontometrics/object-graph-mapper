@@ -73,7 +73,11 @@ public class GraphDBEntityBuilder {
 					if (entitiesMap.containsKey(relationship.getEndNode())) {
 						value = entitiesMap.get(relationship.getEndNode());
 					} else {
-						value = newInstanceOfClass(fieldType);
+						if (relationship.hasProperty(EntityManager.TYPE_PROPERTY)) {
+							value = newInstanceOfClass(Class.forName((String) relationship.getProperty(EntityManager.TYPE_PROPERTY)));
+						} else {
+							value = newInstanceOfClass(fieldType);
+						}
 						build(relationship.getEndNode(), value);
 					}
 					field.set(entity, value);
@@ -96,10 +100,11 @@ public class GraphDBEntityBuilder {
 	 * @throws IllegalArgumentException
 	 * @throws IllegalAccessException
 	 * @throws InstantiationException
+	 * @throws ClassNotFoundException 
 	 */
 	@SuppressWarnings("unchecked")
 	private void buildMapEntry(Object entity, Relationship relationship, Field field, Class<?> fieldType)
-			throws IllegalArgumentException, IllegalAccessException, InstantiationException {
+			throws IllegalArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException {
 		Map<Object, Object> map = (Map<Object, Object>) field.get(entity);
 		if (map == null) {
 			map = HashMap.class.newInstance();
@@ -118,14 +123,20 @@ public class GraphDBEntityBuilder {
 			}
 
 			if (entryNode.hasRelationship(Direction.OUTGOING, DynamicRelationshipType.withName(key))) {
-				Node otherNode = entryNode.getSingleRelationship(DynamicRelationshipType.withName(key),
-						Direction.OUTGOING).getEndNode();
+				Relationship keyRelationship = entryNode.getSingleRelationship(DynamicRelationshipType.withName(key),
+						Direction.OUTGOING);
+				Node otherNode = keyRelationship.getEndNode();
 				Object value = null;
 				if (entitiesMap.containsKey(otherNode)) {
 					value = entitiesMap.get(otherNode);
 				} else {
-					Class<?> type = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[i];
-					value = newInstanceOfClass(type);
+					if (keyRelationship.hasProperty(EntityManager.TYPE_PROPERTY)) {
+						value = newInstanceOfClass(Class.forName((String) keyRelationship.getProperty(EntityManager.TYPE_PROPERTY)));
+					} else {
+						Class<?> type = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[i];
+						value = newInstanceOfClass(type);
+					}
+
 					build(otherNode, value);
 				}
 				values.put(key, value);
@@ -144,17 +155,23 @@ public class GraphDBEntityBuilder {
 	 * @param fieldType
 	 * @throws IllegalAccessException
 	 * @throws InstantiationException
+	 * @throws ClassNotFoundException 
 	 */
 	@SuppressWarnings("unchecked")
 	private void buildCollectionEntry(Object entity, Relationship relationship, Field field, Class<?> fieldType)
-			throws IllegalAccessException, InstantiationException {
+			throws IllegalAccessException, InstantiationException, ClassNotFoundException {
 
 		Collection<Object> collection = (Collection<Object>) field.get(entity);
 		if (collection == null) {
 			collection = (Collection<Object>) newInstanceOfCollection(fieldType);
 			field.set(entity, collection);
 		}
-		fieldType = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
+		if (relationship.hasProperty(EntityManager.TYPE_PROPERTY)) {
+			fieldType = Class.forName((String) relationship.getProperty(EntityManager.TYPE_PROPERTY));
+		} else {
+			fieldType = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
+		}
+
 		Object value = null;
 		if (entitiesMap.containsKey(relationship.getEndNode())) {
 			value = entitiesMap.get(relationship.getEndNode());
