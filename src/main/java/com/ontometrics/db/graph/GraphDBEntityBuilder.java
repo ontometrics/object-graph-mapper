@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.neo4j.graphdb.Direction;
+import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.slf4j.Logger;
@@ -37,7 +38,6 @@ public class GraphDBEntityBuilder {
 		builder.entitiesMap = new HashMap<Node, Object>();
 	}
 
-	@SuppressWarnings("unchecked")
 	private void build(Node node, Object entity) {
 		entitiesMap.put(node, entity);
 
@@ -48,7 +48,8 @@ public class GraphDBEntityBuilder {
 				Field field = getField(entity.getClass(), key);
 				field.setAccessible(true);
 				log.debug("setting field: {} of type {}", field, field.getType());
-				setFieldValue(node.getProperty(key), entity, field);
+				Object value = getFieldValue(node.getProperty(key), entity, field.getType());
+				field.set(entity, value);
 			} catch (Exception e) {
 				log.error("error building entity: " + entity, e);
 			}
@@ -61,32 +62,107 @@ public class GraphDBEntityBuilder {
 				Field field = entity.getClass().getDeclaredField(relationship.getType().name());
 				field.setAccessible(true);
 				log.debug("setting field: {} of type {}", field, field.getType());
-				Collection<Object> collection = null;
 				Class<?> fieldType = field.getType();
 				if (Collection.class.isAssignableFrom(fieldType)) {
-					collection = (Collection<Object>) field.get(entity);
-					if (collection == null) {
-						collection = (Collection<Object>) newInstanceOfCollection(fieldType);
-						field.set(entity, collection);
+					buildCollectionEntry(entity, relationship, field, fieldType);
+				} else if (Map.class.isAssignableFrom(fieldType)) {
+					buildMapEntry(entity, relationship, field, fieldType);
+				} else {
+
+					Object value = null;
+					if (entitiesMap.containsKey(relationship.getEndNode())) {
+						value = entitiesMap.get(relationship.getEndNode());
+					} else {
+						value = newInstanceOfClass(fieldType);
+						build(relationship.getEndNode(), value);
 					}
-					fieldType = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
-				}
-				Object value = null;
-				if (entitiesMap.containsKey(relationship.getEndNode())) {
-					value = entitiesMap.get(relationship.getEndNode());
-				} else {
-					value = newInstanceOfClass(fieldType);
-					build(relationship.getEndNode(), value);
-				}
-				if (collection != null) {
-					collection.add(value);
-				} else {
 					field.set(entity, value);
+
 				}
+
 			} catch (Exception e) {
 				log.error("error building relationship for entity: " + entity, e);
 			}
 		}
+	}
+
+	/**
+	 * Build the key/value pair and add it to the map
+	 * 
+	 * @param entity
+	 * @param relationship
+	 * @param field
+	 * @param fieldType
+	 * @throws IllegalArgumentException
+	 * @throws IllegalAccessException
+	 * @throws InstantiationException
+	 */
+	@SuppressWarnings("unchecked")
+	private void buildMapEntry(Object entity, Relationship relationship, Field field, Class<?> fieldType)
+			throws IllegalArgumentException, IllegalAccessException, InstantiationException {
+		Map<Object, Object> map = (Map<Object, Object>) field.get(entity);
+		if (map == null) {
+			map = HashMap.class.newInstance();
+			field.set(entity, map);
+		}
+		Node entryNode = relationship.getEndNode();
+		String[] keys = new String[] { "key", "value" };// same order like
+														// actualTypeArguments
+														// (classes)
+		Map<String, Object> values = new HashMap<String, Object>();
+		for (int i = 0; i < keys.length; i++) {
+			String key = keys[i];
+			if (entryNode.hasProperty(key)) {
+				Object value = getFieldValue(entryNode.getProperty(key), entity, field.getType());
+				values.put(key, value);
+			}
+
+			if (entryNode.hasRelationship(Direction.OUTGOING, DynamicRelationshipType.withName(key))) {
+				Node otherNode = entryNode.getSingleRelationship(DynamicRelationshipType.withName(key),
+						Direction.OUTGOING).getEndNode();
+				Object value = null;
+				if (entitiesMap.containsKey(otherNode)) {
+					value = entitiesMap.get(otherNode);
+				} else {
+					Class<?> type = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[i];
+					value = newInstanceOfClass(type);
+					build(otherNode, value);
+				}
+				values.put(key, value);
+			}
+		}
+		map.put(values.get("key"), values.get("value"));
+	}
+
+	/**
+	 * Build an entity corresponding to the relationship and add it to the
+	 * collection property in the given entity
+	 * 
+	 * @param entity
+	 * @param relationship
+	 * @param field
+	 * @param fieldType
+	 * @throws IllegalAccessException
+	 * @throws InstantiationException
+	 */
+	@SuppressWarnings("unchecked")
+	private void buildCollectionEntry(Object entity, Relationship relationship, Field field, Class<?> fieldType)
+			throws IllegalAccessException, InstantiationException {
+
+		Collection<Object> collection = (Collection<Object>) field.get(entity);
+		if (collection == null) {
+			collection = (Collection<Object>) newInstanceOfCollection(fieldType);
+			field.set(entity, collection);
+		}
+		fieldType = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
+		Object value = null;
+		if (entitiesMap.containsKey(relationship.getEndNode())) {
+			value = entitiesMap.get(relationship.getEndNode());
+		} else {
+			value = newInstanceOfClass(fieldType);
+			build(relationship.getEndNode(), value);
+		}
+		collection.add(value);
 	}
 
 	@SuppressWarnings("rawtypes")
@@ -138,40 +214,37 @@ public class GraphDBEntityBuilder {
 	}
 
 	/**
-	 * Set the field with the property value. 
-	 * The method uses a converter if the type is not a primitive.
-	 * Or convert array property to a collection before saving.
-	 * Or just set the field, if the type is primitive.
+	 * Get the field's value corresponding to given property.
 	 * 
-	 * @param node
-	 * @param key
+	 * The method uses a converter if the type is not a primitive. Or convert
+	 * array property to a collection before saving. Or return the property
+	 * value, if the type is primitive.
+	 * 
+	 * @param property
+	 * @param entity
 	 * @param type
 	 * @return
-	 * @throws IllegalAccessException 
-	 * @throws IllegalArgumentException 
-	 * @throws InstantiationException 
+	 * @throws IllegalArgumentException
+	 * @throws IllegalAccessException
+	 * @throws InstantiationException
 	 */
 	@SuppressWarnings("unchecked")
-	private static void setFieldValue(Object property, Object entity, Field field) throws IllegalArgumentException, IllegalAccessException, InstantiationException {
-		Class<?> type = field.getType();
+	private static Object getFieldValue(Object property, Object entity, Class<?> type) throws IllegalArgumentException,
+			IllegalAccessException, InstantiationException {
 		TypeConverter converter = TypeRegistry.getConverter(type);
 		if (converter != null) {
-			log.debug("get property with name {} and type {} using converter {}",
-					new Object[] { field.getName(), type, converter.getClass() });
-			Object value = converter.convertFromPrimitive(property);
-			field.set(entity, value);
-			return;
+			log.debug("get property of type {} using converter {}", new Object[] { type, converter.getClass() });
+			return converter.convertFromPrimitive(property);
 		}
-		
-		if(property.getClass().isArray()){
-			log.debug("get property with name {} and type array", field.getName());
-			Collection<Object> collection = (Collection<Object>) newInstanceOfCollection(field.getType());
+
+		if (property.getClass().isArray()) {
+			log.debug("get property of type array");
+			Collection<Object> collection = (Collection<Object>) newInstanceOfCollection(type);
 			collection.addAll(ArrayUtils.toCollection(property));
-			field.set(entity, collection);
-			return;
+			return collection;
 		}
-		
+
 		// if doesn't have a converter then it is primitive
-		field.set(entity, property);
+		return property;
 	}
 }

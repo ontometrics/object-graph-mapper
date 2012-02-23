@@ -5,6 +5,7 @@ import java.lang.reflect.Modifier;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 import javax.persistence.Id;
@@ -222,6 +223,13 @@ public class EntityManager {
 			node.setProperty(name, convertedValue);
 			return;
 		}
+		
+		if(Map.class.isAssignableFrom(value.getClass())){
+			@SuppressWarnings("unchecked")
+			Map<Object, Object> map = (Map<Object, Object>) value;
+			handleMapProperty(node, name, map);
+			return;
+		}
 		if (Collection.class.isAssignableFrom(value.getClass())) {
 			@SuppressWarnings("unchecked")
 			Collection<Object> collection = (Collection<Object>) value;
@@ -237,6 +245,24 @@ public class EntityManager {
 			createRelationship(node, name, value);
 		}
 
+	}
+
+	/**
+	 * Handle saving a map property, it will create a node for each key/value pair, and make a relationship to it.
+	 * key and value will be properties in the new node, should be handled like other properties using setProperty
+	 * 
+	 * @param node
+	 * @param name
+	 * @param value
+	 */
+	private void handleMapProperty(Node node, String name, Map<Object, Object> map) {
+		log.debug("handle a map property {}", name);
+		for(Object key : map.keySet()){
+			Node entryNode = database.createNode();
+			setProperty(entryNode, "key", key);
+			setProperty(entryNode, "value", map.get(key));
+			node.createRelationshipTo(entryNode, DynamicRelationshipType.withName(name));
+		}
 	}
 
 	/**

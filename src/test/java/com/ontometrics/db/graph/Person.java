@@ -78,4 +78,18 @@ public class Person {
 		return visitDuration;
 	}
 
+	@Override
+	public boolean equals(Object arg0) {
+		if(!arg0.getClass().equals(this.getClass())) return false;
+		Person person = (Person) arg0;
+		if(this.getName().equals(person.getName())) return true;
+		return false;
+	}
+
+	@Override
+	public int hashCode() {
+		return this.name.hashCode();
+	}
+
+	
 }
