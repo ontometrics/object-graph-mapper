@@ -1,4 +1,4 @@
-package com.ontometrics.testing;
+package com.ontometrics.util;
 
 import org.junit.rules.TemporaryFolder;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
