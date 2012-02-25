@@ -13,7 +13,10 @@ import org.neo4j.graphdb.Node;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ontometrics.db.graph.model.Car;
+import com.ontometrics.db.graph.model.Employee;
 import com.ontometrics.db.graph.model.RepositoryTestCase;
+import com.ontometrics.db.graph.model.SeniorManager;
 
 public class RepositoryTest extends RepositoryTestCase {
 
@@ -85,6 +88,18 @@ public class RepositoryTest extends RepositoryTestCase {
 			isDeleted = true;
 		}
 		assertThat(isDeleted, is(true));
+	}
+	
+	@Test 
+	public void superClassCollectionsAreRetrieved() {
+		EntityRepository<SeniorManager> repo = new EntityRepository<SeniorManager>();
+		repo.setEntityManager(entityManager);
+		SeniorManager seniorManager = new SeniorManager("Bob", new Car("Cadillac"));
+		seniorManager.addSubordinate(new Employee("Tim"));
+		repo.create(seniorManager);
+		log.debug("senior manager: {}", repo.read(SeniorManager.class, "Bob"));
+		
+		
 	}
 
 }
