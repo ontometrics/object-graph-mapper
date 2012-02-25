@@ -315,6 +315,7 @@ public class EntityManagerTest {
 		assertThat((Long)node.getProperty("hireDate"), is(hireDate.getTime()));
 		assertThat((String)node.getProperty("departmentName"), is(employeeDepartmentName));
 		assertThat((String)node.getProperty("name"), is("neo4j"));
-		
 	}
+	
+
 }

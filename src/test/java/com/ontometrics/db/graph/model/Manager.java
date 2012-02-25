@@ -8,7 +8,9 @@ public class Manager extends Employee {
 	private Manager boss;
 	
 	private List<Employee> subordinates = new ArrayList<Employee>();
-	
+	public Manager() {
+		
+	}
 	public Manager(String name) {
 		super(name);
 	}
@@ -23,6 +25,14 @@ public class Manager extends Employee {
 
 	public void addSubordinate(Employee employee) {
 		this.subordinates.add(employee);
+	}
+	@Override
+	public String toString() {
+		return "Manager [boss=" + boss + ", subordinates=" + subordinates + "]";
+	}
+	
+	public void setSubordinates(List<Employee> subordinates) {
+		this.subordinates = subordinates;
 	}
 
 }

@@ -39,6 +39,7 @@ public class GraphDBEntityBuilder {
 	}
 
 	private void build(Node node, Object entity) {
+		log.debug("building entity: {}", entity.getClass().getName());
 		entitiesMap.put(node, entity);
 
 		log.debug("looking for keys from node: {}", node.toString());
@@ -47,8 +48,8 @@ public class GraphDBEntityBuilder {
 			try {
 				Field field = getField(entity.getClass(), key);
 				field.setAccessible(true);
-				log.debug("setting field: {} of type {}", field, field.getType());
 				Object value = getFieldValue(node.getProperty(key), entity, field.getType());
+				log.debug("setting field: {}, of type: {}, to value: {}", new Object[]{field, field.getType(), value});
 				field.set(entity, value);
 			} catch (Exception e) {
 				log.error("error building entity: " + entity, e);
@@ -58,35 +59,46 @@ public class GraphDBEntityBuilder {
 		while (iterator.hasNext()) {
 			Relationship relationship = iterator.next();
 			log.info("evaluating relationship: {}", relationship.getType().name());
-			try {
-				Field field = entity.getClass().getDeclaredField(relationship.getType().name());
-				field.setAccessible(true);
-				log.debug("setting field: {} of type {}", field, field.getType());
-				Class<?> fieldType = field.getType();
-				if (Collection.class.isAssignableFrom(fieldType)) {
-					buildCollectionEntry(entity, relationship, field, fieldType);
-				} else if (Map.class.isAssignableFrom(fieldType)) {
-					buildMapEntry(entity, relationship, field, fieldType);
-				} else {
 
-					Object value = null;
-					if (entitiesMap.containsKey(relationship.getEndNode())) {
-						value = entitiesMap.get(relationship.getEndNode());
+			// need to see if the field is in a super class
+			Class<?> entityClass = entity.getClass();
+			while (entityClass != null && !entityClass.getName().equals(Object.class.getName())) {
+				try {
+					log.debug("EntityClass is {}", entityClass);
+					log.info("processing field: {}, for class: {}", relationship.getType().name(), entityClass.getName());
+					Field field = entityClass.getDeclaredField(relationship.getType().name());
+					field.setAccessible(true);
+					log.debug("setting field: {} of type {}", field, field.getType());
+					Class<?> fieldType = field.getType();
+					if (Collection.class.isAssignableFrom(fieldType)) {
+						buildCollectionEntry(entity, relationship, field, fieldType);
+					} else if (Map.class.isAssignableFrom(fieldType)) {
+						buildMapEntry(entity, relationship, field, fieldType);
 					} else {
-						if (relationship.hasProperty(EntityManager.TYPE_PROPERTY)) {
-							value = newInstanceOfClass(Class.forName((String) relationship.getProperty(EntityManager.TYPE_PROPERTY)));
+
+						Object value = null;
+						if (entitiesMap.containsKey(relationship.getEndNode())) {
+							value = entitiesMap.get(relationship.getEndNode());
 						} else {
-							value = newInstanceOfClass(fieldType);
+							if (relationship.hasProperty(EntityManager.TYPE_PROPERTY)) {
+								value = newInstanceOfClass(Class.forName((String) relationship
+										.getProperty(EntityManager.TYPE_PROPERTY)));
+							} else {
+								value = newInstanceOfClass(fieldType);
+							}
+							build(relationship.getEndNode(), value);
 						}
-						build(relationship.getEndNode(), value);
+						field.set(entity, value);
 					}
-					field.set(entity, value);
-
+				} catch (NoSuchFieldException e) {
+					log.info("error building relationship for entity: {}, try {}, {} ", new Object[]{entityClass, entityClass.getSuperclass(), e.getMessage()});
+				} catch(Exception ex) {
+					log.error("error building relationship for entity: " + entityClass + ", try  " + entityClass.getSuperclass(), ex);
+				} finally {
+					entityClass = entityClass.getSuperclass();
 				}
-
-			} catch (Exception e) {
-				log.error("error building relationship for entity: " + entity, e);
 			}
+
 		}
 	}
 
@@ -100,7 +112,7 @@ public class GraphDBEntityBuilder {
 	 * @throws IllegalArgumentException
 	 * @throws IllegalAccessException
 	 * @throws InstantiationException
-	 * @throws ClassNotFoundException 
+	 * @throws ClassNotFoundException
 	 */
 	@SuppressWarnings("unchecked")
 	private void buildMapEntry(Object entity, Relationship relationship, Field field, Class<?> fieldType)
@@ -131,9 +143,11 @@ public class GraphDBEntityBuilder {
 					value = entitiesMap.get(otherNode);
 				} else {
 					if (keyRelationship.hasProperty(EntityManager.TYPE_PROPERTY)) {
-						value = newInstanceOfClass(Class.forName((String) keyRelationship.getProperty(EntityManager.TYPE_PROPERTY)));
+						value = newInstanceOfClass(Class.forName((String) keyRelationship
+								.getProperty(EntityManager.TYPE_PROPERTY)));
 					} else {
-						Class<?> type = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[i];
+						Class<?> type = (Class<?>) ((ParameterizedType) field.getGenericType())
+								.getActualTypeArguments()[i];
 						value = newInstanceOfClass(type);
 					}
 
@@ -146,8 +160,7 @@ public class GraphDBEntityBuilder {
 	}
 
 	/**
-	 * Build an entity corresponding to the relationship and add it to the
-	 * collection property in the given entity
+	 * Build an entity corresponding to the relationship and add it to the collection property in the given entity
 	 * 
 	 * @param entity
 	 * @param relationship
@@ -155,7 +168,7 @@ public class GraphDBEntityBuilder {
 	 * @param fieldType
 	 * @throws IllegalAccessException
 	 * @throws InstantiationException
-	 * @throws ClassNotFoundException 
+	 * @throws ClassNotFoundException
 	 */
 	@SuppressWarnings("unchecked")
 	private void buildCollectionEntry(Object entity, Relationship relationship, Field field, Class<?> fieldType)
@@ -233,9 +246,8 @@ public class GraphDBEntityBuilder {
 	/**
 	 * Get the field's value corresponding to given property.
 	 * 
-	 * The method uses a converter if the type is not a primitive. Or convert
-	 * array property to a collection before saving. Or return the property
-	 * value, if the type is primitive.
+	 * The method uses a converter if the type is not a primitive. Or convert array property to a collection before
+	 * saving. Or return the property value, if the type is primitive.
 	 * 
 	 * @param property
 	 * @param entity

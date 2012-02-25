@@ -54,4 +54,13 @@ public class Employee extends Person {
 	public void setBoss(Manager boss) {
 		this.boss = boss;
 	}
+
+	@Override
+	public String toString() {
+		return "Employee [hireDate=" + hireDate + ", departmentName=" + departmentName + ", boss=" + boss
+				+ ", getName()=" + getName() + "]";
+	}
+
+
+	
 }

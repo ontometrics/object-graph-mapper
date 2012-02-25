@@ -92,12 +92,13 @@ public class EntityManager {
 			while (clazz != null && !isCoreType(clazz)) {
 				log.debug("processing class: {}", clazz);
 				for (Field field : clazz.getDeclaredFields()) {
+					log.debug("processing field: {}", field.getName());
 					field.setAccessible(true);
-					if (!isTransient(field)) {
+					if (!isTransient(field) && !isLogger(field)) {
 						Object value = getFieldValue(entity, field);
 						if (value == null) {
 							if (isThePrimaryKey(field)) {
-								throw new IllegalArgumentException("Primary key cannot be null");
+								throw new IllegalArgumentException("Primary key cannot be null, field: " + field.getName());
 							} else {
 								continue;
 							}
@@ -128,6 +129,14 @@ public class EntityManager {
 		} finally {
 			transaction.finish();
 		}
+	}
+
+	private boolean isLogger(Field field) {
+		if(field.getType().getName().contains("Logger")) {
+			log.debug("Ignoring Logger field");
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -208,6 +217,7 @@ public class EntityManager {
 	 * @param value
 	 */
 	private void setProperty(Node node, final String name, Object value) {
+		
 		if (value == null) {
 			removeValueIfExists(node, name);
 			return; // we are not setting null values
