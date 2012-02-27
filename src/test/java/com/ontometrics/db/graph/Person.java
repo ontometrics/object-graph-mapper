@@ -8,9 +8,17 @@ import javax.persistence.Id;
 
 public class Person {
 
+	public enum Color{
+		Red,
+		Blue,
+		Green;
+	}
+	
 	@Id
 	private String name;
 
+	private Color favoriteColor;
+	
 	transient private long visitDuration = 1000; 
 
 	@Index
@@ -76,6 +84,14 @@ public class Person {
 
 	public long getVisitDuration() {
 		return visitDuration;
+	}
+
+	public Color getFavoriteColor() {
+		return favoriteColor;
+	}
+
+	public void setFavoriteColor(Color favoriteColor) {
+		this.favoriteColor = favoriteColor;
 	}
 
 	@Override
