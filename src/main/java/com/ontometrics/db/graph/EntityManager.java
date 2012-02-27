@@ -227,6 +227,9 @@ public class EntityManager {
 			node.setProperty(name, value);
 			return;
 		}
+		if( ((Class<?>)value.getClass()).isEnum()) {
+			log.debug("() is an enum", value.getClass());
+		}
 		TypeConverter converter = TypeRegistry.getConverter(value.getClass());
 		if (converter != null) {
 			log.debug("set property with name '{}' and type '{}' using converter '{}'",

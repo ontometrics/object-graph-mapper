@@ -1,6 +1,7 @@
 package com.ontometrics.db.graph;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
@@ -30,7 +31,11 @@ public class GraphDBEntityBuilder {
 	// the map is to hold created entities to use it to avoid circular
 	// references
 	private Map<Node, Object> entitiesMap = new HashMap<Node, Object>();
-
+	private static Set<String> ignoredClasses = new HashSet<String>();
+	static {
+		ignoredClasses.add("ch.qos.logback.classic.Logger");
+		ignoredClasses.add("org.slf4j.Logger");
+	}
 	public static void buildEntity(Node node, Object entity) {
 		GraphDBEntityBuilder builder = new GraphDBEntityBuilder();
 		builder.build(node, entity);
@@ -47,10 +52,12 @@ public class GraphDBEntityBuilder {
 			log.info("evaluating key: {}", key);
 			try {
 				Field field = getField(entity.getClass(), key);
-				field.setAccessible(true);
-				Object value = getFieldValue(node.getProperty(key), entity, field.getType());
-				log.debug("setting field: {}, of type: {}, to value: {}", new Object[]{field, field.getType(), value});
-				field.set(entity, value);
+				if(isSettable(field)) {
+					field.setAccessible(true);
+					Object value = getFieldValue(node.getProperty(key), entity, field.getType());
+					log.debug("setting field: {}, of type: {}, to value: {}", new Object[]{field, field.getType(), value});
+					field.set(entity, value);
+				}
 			} catch (Exception e) {
 				log.error("error building entity: " + entity, e);
 			}
@@ -62,13 +69,17 @@ public class GraphDBEntityBuilder {
 
 			// need to see if the field is in a super class
 			Class<?> entityClass = entity.getClass();
-			while (entityClass != null && !entityClass.getName().equals(Object.class.getName())) {
+			while (entityClass != null && !Object.class.getName().equals(entityClass.getName())) {
 				try {
 					log.debug("EntityClass is {}", entityClass);
-					log.info("processing field: {}, for class: {}", relationship.getType().name(), entityClass.getName());
+					log.debug("processing field: {}, for class: {}", relationship.getType().name(), entityClass.getName());
 					Field field = entityClass.getDeclaredField(relationship.getType().name());
 					field.setAccessible(true);
 					log.debug("setting field: {} of type {}", field, field.getType());
+					if(ignoredClasses(field.getType())) {
+						continue;
+					}
+						
 					Class<?> fieldType = field.getType();
 					if (Collection.class.isAssignableFrom(fieldType)) {
 						buildCollectionEntry(entity, relationship, field, fieldType);
@@ -100,6 +111,23 @@ public class GraphDBEntityBuilder {
 			}
 
 		}
+	}
+	
+	private boolean isSettable(Field field) {
+		int modifiers = field.getModifiers();
+		if (Modifier.isStatic(modifiers)) {
+			log.debug("field {} is stati, so not settting this field", field.getName());
+			return false;
+		}
+		return true;
+	}
+
+	private boolean ignoredClasses(Class<?> entityClass) {
+		boolean isIgnored = ignoredClasses.contains(entityClass.getName());
+		if(isIgnored) {
+			log.debug("ignoring field for processing of type: {}", entityClass);
+		}
+		return isIgnored;
 	}
 
 	/**
