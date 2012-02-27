@@ -19,6 +19,9 @@ public class TypeRegistry {
 		if(converters.isEmpty()){
 			addMainConverters();
 		}
+		if(objectClass.isEnum()) {
+			return converters.get(Enum.class.getName());
+		}
 		if(converters.containsKey(objectClass.getName())){
 			return converters.get(objectClass.getName());
 		}
@@ -27,6 +30,7 @@ public class TypeRegistry {
 
 	private static void addMainConverters() {
 		TypeRegistry.register(new DateConverter());
+		TypeRegistry.register(new EnumConverter());
 		
 	}
 
