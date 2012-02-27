@@ -21,6 +21,7 @@ import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 
+import com.ontometrics.db.graph.Person.Color;
 import com.ontometrics.db.graph.model.AddressBook;
 import com.ontometrics.db.graph.model.Employee;
 import com.ontometrics.testing.TestGraphDatabase;
@@ -208,10 +209,22 @@ public class GraphDBEntityBuilderTest {
 		assertThat(address.getOwner(), notNullValue());
 		assertThat(address.getOwner().getName(), is("Joe"));
 		
-		
-		
 	}
 
+	@Test
+	public void buildEntityWithEnums(){
+		Node enumNode = database.getDatabase().createNode();
+		enumNode.setProperty("name", "Green");
+		
+		Relationship relationship = personNode.createRelationshipTo(enumNode, DynamicRelationshipType.withName("favoriteColor"));
+		relationship.setProperty(EntityManager.TYPE_PROPERTY, Color.class.getName());
+
+		Person person = new Person();
+		GraphDBEntityBuilder.buildEntity(personNode, person);
+		assertThat(person.getFavoriteColor(), is(Color.Green));
+		
+	}
+	
 	@Test
 	public void superClassPropertiesAreDiscovered() {
 		Node employeeNode = database.getDatabase().createNode();

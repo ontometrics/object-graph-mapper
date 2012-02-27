@@ -85,8 +85,10 @@ public class GraphDBEntityBuilder {
 						buildCollectionEntry(entity, relationship, field, fieldType);
 					} else if (Map.class.isAssignableFrom(fieldType)) {
 						buildMapEntry(entity, relationship, field, fieldType);
+					} else if (fieldType.isEnum() || (fieldType.isInterface() && isEnum(relationship))) {
+						buildEnumProperty(entity, relationship, field);
 					} else {
-
+						
 						Object value = null;
 						if (entitiesMap.containsKey(relationship.getEndNode())) {
 							value = entitiesMap.get(relationship.getEndNode());
@@ -113,6 +115,43 @@ public class GraphDBEntityBuilder {
 		}
 	}
 	
+	/**
+	 * @param relationship
+	 * @return
+	 */
+	private boolean isEnum(Relationship relationship) {
+		//enum can implements an interface, so checking the interface is an enum will not be enough
+		
+		if(relationship.hasProperty(EntityManager.TYPE_PROPERTY)){
+			try {
+				Class<?> _class = Class.forName((String) relationship.getProperty(EntityManager.TYPE_PROPERTY));
+				return _class.isEnum();
+			} catch (ClassNotFoundException e) {
+				return false;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * set enum property in the given entity
+	 * @param entity
+	 * @param relationship
+	 * @param field
+	 * @param fieldType
+	 * @throws ClassNotFoundException 
+	 * @throws IllegalAccessException 
+	 * @throws IllegalArgumentException 
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private void buildEnumProperty(Object entity, Relationship relationship, Field field) throws ClassNotFoundException, IllegalArgumentException, IllegalAccessException {
+		String enumClass = (String) relationship.getProperty(EntityManager.TYPE_PROPERTY);
+		
+		Class<? extends Enum> _class = (Class<? extends Enum>) Class.forName(enumClass);
+		Object value = Enum.valueOf(_class, (String) relationship.getEndNode().getProperty("name"));
+		field.set(entity, value);
+	}
+
 	private boolean isSettable(Field field) {
 		int modifiers = field.getModifiers();
 		if (Modifier.isStatic(modifiers)) {

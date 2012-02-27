@@ -242,6 +242,12 @@ public class EntityManager {
 			handleMapProperty(node, name, map);
 			return;
 		}
+		
+		if(value.getClass().isEnum()){
+			handleEnumProperty(node, name, (Enum<?>) value);
+			return;
+		}
+		
 		if (Collection.class.isAssignableFrom(value.getClass())) {
 			@SuppressWarnings("unchecked")
 			Collection<Object> collection = (Collection<Object>) value;
@@ -257,6 +263,24 @@ public class EntityManager {
 			createRelationship(node, name, value);
 		}
 
+	}
+
+	/**
+	 * save the Enum property as a relationship with a property to hold the enum class, and the end node has a name property
+	 * @param node
+	 * @param name
+	 * @param value
+	 */
+	private void handleEnumProperty(Node node, String name, Enum<?> value) {
+		Node enumNode = getNodeIndex(value.getClass()).get(PRIMARY_KEY, value.name()).getSingle();
+		if (enumNode == null) {
+			enumNode = database.createNode();
+			setProperty(enumNode, "name", value.name());
+			setProperty(enumNode, "ordinal", value.ordinal());
+			getNodeIndex(value.getClass()).add(enumNode, PRIMARY_KEY, value.name());
+		}
+		Relationship relationship = node.createRelationshipTo(enumNode, DynamicRelationshipType.withName(name));
+		relationship.setProperty(TYPE_PROPERTY, value.getClass().getName());
 	}
 
 	/**

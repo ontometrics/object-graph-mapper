@@ -27,6 +27,7 @@ import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.index.IndexHits;
 import org.neo4j.graphdb.index.ReadableRelationshipIndex;
 
+import com.ontometrics.db.graph.Person.Color;
 import com.ontometrics.db.graph.model.AddressBook;
 import com.ontometrics.db.graph.model.Employee;
 import com.ontometrics.testing.TestGraphDatabase;
@@ -263,6 +264,26 @@ public class EntityManagerTest {
 		assertThat((String) relationship.getProperty(EntityManager.TYPE_PROPERTY), is(Employee.class.getName()));		
 	}
 
+	@Test
+	public void createEntityWithEnums(){
+		person.setFavoriteColor(Color.Green);
+		
+		Node personNode = entityManager.create(person);
+
+		Relationship relationShip = personNode.getSingleRelationship(DynamicRelationshipType.withName("favoriteColor"), Direction.OUTGOING);
+		assertThat(relationShip, notNullValue());	
+		assertThat((String)relationShip.getEndNode().getProperty("name"), is("Green"));
+		assertThat((String)relationShip.getProperty(EntityManager.TYPE_PROPERTY), is(Color.class.getName()));
+
+		Person anotherPerson = new Person("Ann");
+		anotherPerson.setFavoriteColor(Color.Green);
+		Node anotherPersonNode = entityManager.create(anotherPerson);
+
+		Relationship relationShip2 = anotherPersonNode.getSingleRelationship(DynamicRelationshipType.withName("favoriteColor"), Direction.OUTGOING);
+		assertThat(relationShip2, notNullValue());	
+		assertThat(relationShip2.getEndNode(), is(relationShip.getEndNode()));
+	}
+	
 	@Test
 	public void updateNullValueWilRemoveIt(){
 		person.setAddress(new Address(addressName, city, country));
