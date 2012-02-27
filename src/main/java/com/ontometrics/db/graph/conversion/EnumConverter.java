@@ -5,23 +5,28 @@ import org.slf4j.LoggerFactory;
 
 public class EnumConverter implements TypeConverter {
 	private static final Logger log = LoggerFactory.getLogger(EnumConverter.class);
+	
+	@SuppressWarnings("rawtypes")
+	private Class<? extends Enum> enumClass;
+	
+	
+	public EnumConverter(@SuppressWarnings("rawtypes") Class<? extends Enum> enumClass) {
+		super();
+		this.enumClass = enumClass;
+	}
+
 	public Class<?> getType() {
-		return Enum.class;
+		return enumClass;
 	}
 
 	public Object convertToPrimitive(Object value) {
 		return value.toString();
 	}
 
+	
+	@SuppressWarnings("unchecked")
 	public Object convertFromPrimitive(Object value) {
 		log.debug("converting to Enum from {}", value);
-		return Enum.valueOf((Class<Enum>) value, (String)value);
+		return Enum.valueOf(enumClass, (String) value);
 	}
-	public enum Day {
-		Monday, Tuesday, Wednesday;
-	}
-	public static void main(String[] args) {
-		System.out.println(Enum.valueOf(Day.class, "Monday"));
-	}
-
 }
