@@ -1,13 +1,14 @@
 package com.ontometrics.db.graph;
 
-import javax.persistence.Id;
-
 import com.ontometrics.db.graph.Person;
 
 
 public class Address {
 
 	@Id
+	@GeneratedId
+	private Long id;
+	
 	private String name;
 	
 	private String city;
@@ -58,6 +59,8 @@ public class Address {
 	public void setOwner(Person owner) {
 		this.owner = owner;
 	}
-	
-	
+
+	public Long getId() {
+		return id;
+	}
 }
