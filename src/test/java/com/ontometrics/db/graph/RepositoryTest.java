@@ -116,10 +116,15 @@ public class RepositoryTest extends RepositoryTestCase {
 		assertThat(retrievedManager.getSubordinates().size(), is(1));
 		manager.addSubordinate(new Employee("Sharon", new DateTime().minusYears(20).toDate(), "Engineering", new Date()));
 		repo.update(manager);
-		
+
 		retrievedManager = repo.read(Manager.class, "Bob");
 		assertThat(retrievedManager.getSubordinates().size(), is(2));
-		
+
+		manager.getSubordinates().remove(0);
+		repo.update(manager);
+
+		retrievedManager = repo.read(Manager.class, "Bob");
+		assertThat(retrievedManager.getSubordinates().size(), is(1));
 		
 	}
 
