@@ -1,6 +1,9 @@
 package com.ontometrics.db.graph;
 
+import java.lang.reflect.Field;
 import java.text.MessageFormat;
+
+import javax.persistence.Id;
 
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
@@ -34,18 +37,45 @@ public class EntityRepository<T> {
 		return entity;
 	}
 
-	public void update(T entity, Object primaryKey) {
+	public void update(T entity) {
 		// TODO: this should be: entityManager.update(), then we'd have one tx.
+		Object primaryKey = getPrimaryKey(entity);
+		if(primaryKey == null){
+			throw new IllegalArgumentException(MessageFormat.format(
+					"No primary key for class {0}", entity.getClass()));
+		}
 		Transaction transaction = entityManager.getDatabase().beginTx();
 		Index<Node> index = entityManager.getNodeIndex(entity.getClass());
 		Node node = index.get(EntityManager.PRIMARY_KEY, primaryKey).getSingle();
 		if(node == null){
 			throw new IllegalArgumentException(MessageFormat.format(
-					"No node exists for class {0} with primary key {1}", entity, primaryKey));
+					"No node exists for class {0} with primary key {1}", entity.getClass(), primaryKey));
 		}
 		entityManager.update(entity, node);
 		transaction.success();
 		transaction.finish();
+	}
+
+	private Object getPrimaryKey(T entity) {
+		Class<?> clazz = entity.getClass();
+		while (clazz != null && !clazz.isPrimitive() && !clazz.equals(Object.class)) {
+			for (Field field : clazz.getDeclaredFields()) {
+				try {
+					if (isThePrimaryKey(field)) {
+						field.setAccessible(true);
+						return field.get(entity);
+					}
+				} catch (Exception e) {
+					log.error("error creating node for entity: " + entity, e);
+				}
+			}
+			clazz = clazz.getSuperclass();
+		}
+		return null;
+	}
+
+	private static boolean isThePrimaryKey(Field field) {
+		return field.isAnnotationPresent(Id.class);
 	}
 
 	public void destroy(T entity, Object primaryKey) {

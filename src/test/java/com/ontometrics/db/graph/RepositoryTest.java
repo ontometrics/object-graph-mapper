@@ -61,7 +61,7 @@ public class RepositoryTest extends RepositoryTestCase {
 		Date newBirthdate = new SimpleDateFormat("MM/dd/yyyy").parse("1/1/2000");
 		log.info("new birthdate: {}", newBirthdate);
 		Person udpatedPerson = new Person("neo4j", newBirthdate);
-		repository.update(udpatedPerson, "neo4j");
+		repository.update(udpatedPerson);
 
 		// lookup the person and verify the birth date has been updated
 		Person readPerson = repository.read(Person.class, "neo4j");
@@ -115,7 +115,7 @@ public class RepositoryTest extends RepositoryTestCase {
 		Manager retrievedManager = repo.read(Manager.class, "Bob");
 		assertThat(retrievedManager.getSubordinates().size(), is(1));
 		manager.addSubordinate(new Employee("Sharon", new DateTime().minusYears(20).toDate(), "Engineering", new Date()));
-		repo.update(manager, "Bob");
+		repo.update(manager);
 		
 		retrievedManager = repo.read(Manager.class, "Bob");
 		assertThat(retrievedManager.getSubordinates().size(), is(2));
