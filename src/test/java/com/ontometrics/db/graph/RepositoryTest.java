@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.graphdb.Node;
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import com.ontometrics.db.graph.model.Car;
 import com.ontometrics.db.graph.model.Employee;
+import com.ontometrics.db.graph.model.Manager;
 import com.ontometrics.db.graph.model.RepositoryTestCase;
 import com.ontometrics.db.graph.model.SeniorManager;
 
@@ -98,6 +100,25 @@ public class RepositoryTest extends RepositoryTestCase {
 		seniorManager.addSubordinate(new Employee("Tim"));
 		repo.create(seniorManager);
 		log.debug("senior manager: {}", repo.read(SeniorManager.class, "Bob"));
+		
+		
+	}
+	
+	@Test
+	public void canUpdateEntityWithCollection() {
+		EntityRepository<Manager> repo = new EntityRepository<Manager>();
+		repo.setEntityManager(entityManager);
+		Manager manager = new Manager("Bob");
+		manager.addSubordinate(new Employee("Tom", new DateTime().minusYears(30).toDate(), "Engineering", new Date()));
+		
+		repo.create(manager);
+		Manager retrievedManager = repo.read(Manager.class, "Bob");
+		assertThat(retrievedManager.getSubordinates().size(), is(1));
+		manager.addSubordinate(new Employee("Sharon", new DateTime().minusYears(20).toDate(), "Engineering", new Date()));
+		repo.update(manager, "Bob");
+		
+		retrievedManager = repo.read(Manager.class, "Bob");
+		assertThat(retrievedManager.getSubordinates().size(), is(2));
 		
 		
 	}
