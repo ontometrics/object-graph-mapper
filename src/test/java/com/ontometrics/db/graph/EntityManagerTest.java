@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.greaterThan;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -73,30 +74,10 @@ public class EntityManagerTest {
 		
 		person = new Person(username, birthdate);
 		employee = new Employee("neo4j", birthdate, employeeDepartmentName, hireDate);
-		addressType = new RelationshipType() {
-			public String name() {
-				return "address";
-			}
-		};
-
-		parentType = new RelationshipType() {
-			public String name() {
-				return "parent";
-			}
-		};
-
-		ownerType = new RelationshipType() {
-			public String name() {
-				return "owner";
-			}
-		};
-
-		friendsType = new RelationshipType() {
-			public String name() {
-				return "friends";
-			}
-		};
-
+		addressType = DynamicRelationshipType.withName("address");
+		parentType = DynamicRelationshipType.withName("parent");
+		ownerType = DynamicRelationshipType.withName("owner");
+		friendsType = DynamicRelationshipType.withName("friends");
 	}
 	
 	@Test
@@ -347,6 +328,28 @@ public class EntityManagerTest {
 		assertThat((String)node.getProperty("departmentName"), is(employeeDepartmentName));
 		assertThat((String)node.getProperty("name"), is("neo4j"));
 	}
+
 	
+	@Test
+	public void generateIdForCreatedEntities() {
+		Address address = new Address("home", "LA", "CA");
+		entityManager.create(address);
+		assertThat(address.getId(), notNullValue());
+		assertThat(address.getId(), greaterThan(0l));
+		
+		person.setAddress(new Address("xx", "LA", "CA"));
+		
+		employee.setAddress(person.getAddress());
+		
+		Node personNode = entityManager.create(person);
+		Node employeeNode = entityManager.create(employee);
+		
+		assertThat(person.getAddress().getId(), notNullValue());
+		assertThat(employee.getAddress().getId(), is(person.getAddress().getId()));
+		
+		Node addressNode = personNode.getSingleRelationship(addressType, Direction.OUTGOING).getEndNode();
+		
+		assertThat(employeeNode.getSingleRelationship(addressType, Direction.OUTGOING).getEndNode(), is(addressNode));
+	}
 
 }

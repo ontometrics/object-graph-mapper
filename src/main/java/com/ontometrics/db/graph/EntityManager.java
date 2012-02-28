@@ -8,7 +8,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import javax.persistence.Id;
 import javax.persistence.Transient;
 
 import org.neo4j.graphdb.Direction;
@@ -98,7 +97,11 @@ public class EntityManager {
 						Object value = getFieldValue(entity, field);
 						if (value == null) {
 							if (isThePrimaryKey(field)) {
-								throw new IllegalArgumentException("Primary key cannot be null, field: " + field.getName());
+								if(field.isAnnotationPresent(GeneratedId.class)){
+									value = assignId(entity, field, node.getId());
+								}else{
+									throw new IllegalArgumentException("Primary key cannot be null, field: " + field.getName());
+								}
 							} else {
 								continue;
 							}
@@ -129,6 +132,21 @@ public class EntityManager {
 		} finally {
 			transaction.finish();
 		}
+	}
+
+	private Object assignId(Object entity, Field field, long id) {
+		if(id == 0){
+			throw new IllegalArgumentException("cannot assign id w/ value zero");
+		}
+		try {
+			field.set(entity, Long.valueOf(id));
+		} catch (IllegalArgumentException e) {
+			throw e;
+		} catch (IllegalAccessException e) {
+			throw new IllegalArgumentException("cannot assign id: "+ e.getMessage());
+		}
+		
+		return Long.valueOf(id);
 	}
 
 	private boolean isLogger(Field field) {
@@ -506,7 +524,7 @@ public class EntityManager {
 	}
 
 	private static boolean isThePrimaryKey(Field field) {
-		return field.isAnnotationPresent(Id.class);
+		return field.isAnnotationPresent(javax.persistence.Id.class) || field.isAnnotationPresent(Id.class);
 	}
 
 	public void setDatabase(EmbeddedGraphDatabase database) {

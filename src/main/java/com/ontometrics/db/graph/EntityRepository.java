@@ -3,8 +3,6 @@ package com.ontometrics.db.graph;
 import java.lang.reflect.Field;
 import java.text.MessageFormat;
 
-import javax.persistence.Id;
-
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.index.Index;
@@ -75,7 +73,7 @@ public class EntityRepository<T> {
 	}
 
 	private static boolean isThePrimaryKey(Field field) {
-		return field.isAnnotationPresent(Id.class);
+		return field.isAnnotationPresent(javax.persistence.Id.class) || field.isAnnotationPresent(Id.class);
 	}
 
 	public void destroy(T entity, Object primaryKey) {
