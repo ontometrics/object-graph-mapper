@@ -236,6 +236,8 @@ public class EntityManager {
 			return;
 		}
 		
+		deleteRelationships(node, DynamicRelationshipType.withName(name), Direction.OUTGOING);
+		
 		if(Map.class.isAssignableFrom(value.getClass())){
 			@SuppressWarnings("unchecked")
 			Map<Object, Object> map = (Map<Object, Object>) value;
@@ -254,7 +256,6 @@ public class EntityManager {
 			if(isCollectionOfPrimitives(collection) && !collection.isEmpty()){
 				node.setProperty(name, ArrayUtils.toPrimitives(collection));
 			}else{
-				
 				for (Object object : collection) {
 					createRelationship(node, name, object);
 				}
@@ -263,6 +264,22 @@ public class EntityManager {
 			createRelationship(node, name, value);
 		}
 
+	}
+
+	/**
+	 * delete all relationships for the given type and direction
+	 * 
+	 * @param node
+	 * @param withName
+	 * @param outgoing
+	 */
+	private void deleteRelationships(Node node, RelationshipType type, Direction direction) {
+		if(!node.hasRelationship(type, direction)) return;
+		Iterator<Relationship> iterator = node.getRelationships(type, direction).iterator();
+		while(iterator.hasNext()){
+			Relationship relationship = iterator.next();
+			relationship.delete();
+		}
 	}
 
 	/**
@@ -398,15 +415,11 @@ public class EntityManager {
 		return existingNode;
 	}
 
-	private static void removeValueIfExists(Node node, final String name) {
+	private void removeValueIfExists(Node node, final String name) {
 		if (node.hasProperty(name)) {
 			node.removeProperty(name);
 		} else {
-			Iterator<Relationship> iterator = node.getRelationships(Direction.OUTGOING,
-					DynamicRelationshipType.withName(name)).iterator();
-			while (iterator.hasNext()) {
-				iterator.next().delete();
-			}
+			deleteRelationships(node, DynamicRelationshipType.withName(name), Direction.OUTGOING);
 		}
 
 	}
@@ -427,10 +440,26 @@ public class EntityManager {
 			toNode = create(value);
 		} else {
 			log.debug("found existing node for the relationship '{}'", name);
+			//check if relationship already exists
+			if(existingRelationship(node, toNode, DynamicRelationshipType.withName(name)) != null) return;
 		}
 		Relationship relationship = node.createRelationshipTo(toNode, DynamicRelationshipType.withName(name));
 		relationship.setProperty(TYPE_PROPERTY, value.getClass().getName());
 
+	}
+
+	private Relationship existingRelationship(Node fromNode, Node toNode, RelationshipType type) {
+		if(fromNode.hasRelationship(type, Direction.OUTGOING)){
+			Iterator<Relationship> iterator = fromNode.getRelationships(type, Direction.OUTGOING).iterator();
+			while(iterator.hasNext()){
+				Relationship relationship = iterator.next();
+				if(relationship.getEndNode().getId() == toNode.getId()){
+					log.debug("relationship already exists");
+					return relationship;
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -445,19 +474,22 @@ public class EntityManager {
 	 */
 	private Node existingNodeFor(Object entity) {
 		Object primaryKey = null;
-		for (Field field : entity.getClass().getDeclaredFields()) {
-			try {
-				if (isThePrimaryKey(field)) {
-					field.setAccessible(true);
-					primaryKey = field.get(entity);
-					break;
+		Class<?> clazz = entity.getClass();
+		while (clazz != null && !isCoreType(clazz)) {
+			for (Field field : clazz.getDeclaredFields()) {
+				try {
+					if (isThePrimaryKey(field)) {
+						field.setAccessible(true);
+						primaryKey = field.get(entity);
+						if (primaryKey != null) {
+							return getNodeIndex(entity.getClass()).get(PRIMARY_KEY, primaryKey).getSingle();
+						}
+					}
+				} catch (Exception e) {
+					log.error("error creating node for entity: " + entity, e);
 				}
-			} catch (Exception e) {
-				log.error("error creating node for entity: " + entity, e);
 			}
-		}
-		if (primaryKey != null) {
-			return getNodeIndex(entity.getClass()).get(PRIMARY_KEY, primaryKey).getSingle();
+			clazz = clazz.getSuperclass();
 		}
 		return null;
 	}

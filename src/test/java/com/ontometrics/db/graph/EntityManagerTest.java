@@ -3,6 +3,7 @@ package com.ontometrics.db.graph;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
@@ -266,11 +267,12 @@ public class EntityManagerTest {
 
 	@Test
 	public void createEntityWithEnums(){
+		RelationshipType favoriteColorType = DynamicRelationshipType.withName("favoriteColor");
 		person.setFavoriteColor(Color.Green);
 		
 		Node personNode = entityManager.create(person);
 
-		Relationship relationShip = personNode.getSingleRelationship(DynamicRelationshipType.withName("favoriteColor"), Direction.OUTGOING);
+		Relationship relationShip = personNode.getSingleRelationship(favoriteColorType, Direction.OUTGOING);
 		assertThat(relationShip, notNullValue());	
 		assertThat((String)relationShip.getEndNode().getProperty("name"), is("Green"));
 		assertThat((String)relationShip.getProperty(EntityManager.TYPE_PROPERTY), is(Color.class.getName()));
@@ -279,9 +281,17 @@ public class EntityManagerTest {
 		anotherPerson.setFavoriteColor(Color.Green);
 		Node anotherPersonNode = entityManager.create(anotherPerson);
 
-		Relationship relationShip2 = anotherPersonNode.getSingleRelationship(DynamicRelationshipType.withName("favoriteColor"), Direction.OUTGOING);
+		Relationship relationShip2 = anotherPersonNode.getSingleRelationship(favoriteColorType, Direction.OUTGOING);
 		assertThat(relationShip2, notNullValue());	
 		assertThat(relationShip2.getEndNode(), is(relationShip.getEndNode()));
+		
+		anotherPerson.setFavoriteColor(Color.Blue);
+		entityManager.update(anotherPerson, anotherPersonNode);
+		
+		relationShip2 = anotherPersonNode.getSingleRelationship(favoriteColorType, Direction.OUTGOING);
+		assertThat(relationShip2, notNullValue());	
+		assertThat(relationShip2.getEndNode(), not(relationShip.getEndNode()));
+		assertThat((String)relationShip2.getEndNode().getProperty("name"), is("Blue"));
 	}
 	
 	@Test
