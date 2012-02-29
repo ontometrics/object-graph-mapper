@@ -48,6 +48,8 @@ public class EntityManager {
 	 */
 	private EmbeddedGraphDatabase database;
 
+	private Set<Long> updatedNodes = new HashSet<Long>();
+	
 	/**
 	 * Passed in on creation. This just wraps itself around the database and
 	 * offers basic help with CRUD support for corresponding repositories.
@@ -86,52 +88,59 @@ public class EntityManager {
 	public Node create(Object entity) {
 		Transaction transaction = database.beginTx();
 		try {
-			Node node = database.createNode();
-			Class<?> clazz = entity.getClass();
-			while (clazz != null && !isCoreType(clazz)) {
-				log.debug("processing class: {}", clazz);
-				for (Field field : clazz.getDeclaredFields()) {
-					log.debug("processing field: {}", field.getName());
-					field.setAccessible(true);
-					if (!isTransient(field) && !isLogger(field)) {
-						Object value = getFieldValue(entity, field);
-						if (value == null) {
-							if (isThePrimaryKey(field)) {
-								if(field.isAnnotationPresent(GeneratedId.class)){
-									value = assignId(entity, field, node.getId());
-								}else{
-									throw new IllegalArgumentException("Primary key cannot be null, field: " + field.getName());
-								}
-							} else {
-								continue;
-							}
-						}
-						setProperty(node, field.getName(), value);
-						//index the entity using the key/value in the index annotation
-						if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
-							String indexKey = field.getAnnotation(com.ontometrics.db.graph.Index.class).key();
-							String indexValueName = field.getAnnotation(com.ontometrics.db.graph.Index.class).value();
-							Object indexValue = null;
-							if (indexKey.equals("n/a")) {
-								indexKey = field.getName();
-							}
-							if (!indexValueName.equals("n/a")) {
-								indexValue = getFieldValue(entity, getFieldWithName(entity, indexValueName));
-							}
-							addIndex(entity.getClass(), node, field.getName(), value, indexKey, indexValue);
-						}
-						if (isThePrimaryKey(field)) {
-							getNodeIndex(entity.getClass()).add(node, PRIMARY_KEY, value);
-						}
-					}
-				}
-				clazz = clazz.getSuperclass();
-			}
+			updatedNodes = new HashSet<Long>();
+			Node node = createNode(entity);
 			transaction.success();
 			return node;
 		} finally {
 			transaction.finish();
 		}
+	}
+
+	private Node createNode(Object entity) {
+		Node node = database.createNode();
+		updatedNodes.add(node.getId());
+		Class<?> clazz = entity.getClass();
+		while (clazz != null && !isCoreType(clazz)) {
+			log.debug("processing class: {}", clazz);
+			for (Field field : clazz.getDeclaredFields()) {
+				log.debug("processing field: {}", field.getName());
+				field.setAccessible(true);
+				if (!isTransient(field) && !isLogger(field)) {
+					Object value = getFieldValue(entity, field);
+					if (value == null) {
+						if (isThePrimaryKey(field)) {
+							if(field.isAnnotationPresent(GeneratedId.class)){
+								value = assignId(entity, field, node.getId());
+							}else{
+								throw new IllegalArgumentException("Primary key cannot be null, field: " + field.getName());
+							}
+						} else {
+							continue;
+						}
+					}
+					setProperty(node, field.getName(), value);
+					//index the entity using the key/value in the index annotation
+					if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
+						String indexKey = field.getAnnotation(com.ontometrics.db.graph.Index.class).key();
+						String indexValueName = field.getAnnotation(com.ontometrics.db.graph.Index.class).value();
+						Object indexValue = null;
+						if (indexKey.equals("n/a")) {
+							indexKey = field.getName();
+						}
+						if (!indexValueName.equals("n/a")) {
+							indexValue = getFieldValue(entity, getFieldWithName(entity, indexValueName));
+						}
+						addIndex(entity.getClass(), node, field.getName(), value, indexKey, indexValue);
+					}
+					if (isThePrimaryKey(field)) {
+						getNodeIndex(entity.getClass()).add(node, PRIMARY_KEY, value);
+					}
+				}
+			}
+			clazz = clazz.getSuperclass();
+		}
+		return node;
 	}
 
 	private Object assignId(Object entity, Field field, long id) {
@@ -412,25 +421,41 @@ public class EntityManager {
 	 */
 	public Node update(Object entity, Node existingNode) {
 		Transaction transaction = database.beginTx();
-		for (Field field : entity.getClass().getDeclaredFields()) {
-			try {
-				field.setAccessible(true);
-				Object value = field.get(entity);
-				if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
-					updateIndex(entity.getClass(), existingNode, field.getName(), value);
-				}
-
-				if (!Modifier.isTransient(field.getModifiers())) {
-					setProperty(existingNode, field.getName(), value);
-				}
-				transaction.success();
-			} catch (Exception e) {
-				log.error("error updating node for entity: " + entity, e);
-			} finally {
-				transaction.finish();
-			}
+		try {
+			updatedNodes = new HashSet<Long>();
+			updateNode(entity, existingNode);
+			transaction.success();
+		} catch (Exception e) {
+			log.error("error updating node for entity: " + entity, e);
+		} finally {
+			transaction.finish();
 		}
 		return existingNode;
+	}
+
+	private void updateNode(Object entity, Node existingNode) {
+		log.debug("updating entity {}", entity);
+		updatedNodes.add(existingNode.getId());
+		Class<?> clazz = entity.getClass();
+		while (clazz != null && !isCoreType(clazz)) {
+			for (Field field : clazz.getDeclaredFields()) {
+				try {
+					field.setAccessible(true);
+					Object value = field.get(entity);
+					if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
+						updateIndex(entity.getClass(), existingNode, field.getName(), value);
+					}
+
+					if (!isTransient(field)) {
+						setProperty(existingNode, field.getName(), value);
+					}
+
+				} catch (Exception e) {
+					log.error("error updating node for entity: " + entity, e);
+				}
+			}
+			clazz = clazz.getSuperclass();
+		}
 	}
 
 	private void removeValueIfExists(Node node, final String name) {
@@ -455,9 +480,13 @@ public class EntityManager {
 		log.debug("Create a relationship and node for {}", name);
 		Node toNode = existingNodeFor(value);
 		if (toNode == null) {
-			toNode = create(value);
+			toNode = createNode(value);
 		} else {
 			log.debug("found existing node for the relationship '{}'", name);
+			if(!updatedNodes.contains(toNode.getId())){
+				log.debug("update existing node for the relationship '{}'", name);
+				updateNode(value, toNode);
+			}
 			//check if relationship already exists
 			if(existingRelationship(node, toNode, DynamicRelationshipType.withName(name)) != null) return;
 		}

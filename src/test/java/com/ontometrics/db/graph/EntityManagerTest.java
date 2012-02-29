@@ -351,5 +351,27 @@ public class EntityManagerTest {
 		
 		assertThat(employeeNode.getSingleRelationship(addressType, Direction.OUTGOING).getEndNode(), is(addressNode));
 	}
+	
+	@Test
+	public void canUpdateRelationships() {
+		Address address = new Address("home", "LA", "CA");
+		entityManager.create(address);
+		
+		person.setAddress(address);
+		Node personNode = entityManager.create(person);
+		
+		address.setCity("Los Angeles");
+		entityManager.update(person, personNode);
+		
+		Node addressNode = personNode.getSingleRelationship(addressType, Direction.OUTGOING).getEndNode();
+		assertThat((String) addressNode.getProperty("city"), is("Los Angeles"));
+		
+		address.setName("Work");
+		employee.setAddress(address);
+		Node employeeNode = entityManager.create(person);
+		addressNode = employeeNode.getSingleRelationship(addressType, Direction.OUTGOING).getEndNode();
+		assertThat((String) addressNode.getProperty("name"), is("Work"));
+	}
+	
 
 }
