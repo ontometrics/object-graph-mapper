@@ -120,19 +120,7 @@ public class EntityManager {
 						}
 					}
 					setProperty(node, field.getName(), value);
-					//index the entity using the key/value in the index annotation
-					if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
-						String indexKey = field.getAnnotation(com.ontometrics.db.graph.Index.class).key();
-						String indexValueName = field.getAnnotation(com.ontometrics.db.graph.Index.class).value();
-						Object indexValue = null;
-						if (indexKey.equals("n/a")) {
-							indexKey = field.getName();
-						}
-						if (!indexValueName.equals("n/a")) {
-							indexValue = getFieldValue(entity, getFieldWithName(entity, indexValueName));
-						}
-						addIndex(entity.getClass(), node, field.getName(), value, indexKey, indexValue);
-					}
+					updateIndex(node, entity, field);
 					if (isThePrimaryKey(field)) {
 						getNodeIndex(entity.getClass()).add(node, PRIMARY_KEY, value);
 					}
@@ -141,6 +129,38 @@ public class EntityManager {
 			clazz = clazz.getSuperclass();
 		}
 		return node;
+	}
+
+	/**
+	 * update index for given field if it is marked as indexed
+	 * @param node
+	 * @param entity
+	 * @param field
+	 */
+	private void updateIndex(Node node, Object entity, Field field) {
+		Object value = getFieldValue(entity, field);
+		//index the entity using the key/value in the index annotation
+		if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
+			String indexKey = field.getAnnotation(com.ontometrics.db.graph.Index.class).key();
+			String indexValueName = field.getAnnotation(com.ontometrics.db.graph.Index.class).value();
+			Object indexValue = null;
+			if (indexKey.equals("n/a")) {
+				indexKey = field.getName();
+			}
+			if (!indexValueName.equals("n/a")) {
+				Field valuefield = getFieldWithName(entity, indexValueName);
+				if(valuefield != null){
+					indexValue = getFieldValue(entity, valuefield);
+				}else{
+					try {
+						indexValue = entity.getClass().getMethod(indexValueName).invoke(entity);
+					} catch (Exception e) {
+						log.error("indexValueName not a field or method", e);
+					}
+				}
+			}
+			addIndex(entity.getClass(), node, field.getName(), value, indexKey, indexValue);
+		}
 	}
 
 	private Object assignId(Object entity, Field field, long id) {
@@ -392,20 +412,14 @@ public class EntityManager {
 	 * @param name
 	 * @param value
 	 */
-	private void updateIndex(Class<?> aClass, Node node, String name, Object value) {
+	private void deleteIndex(Class<?> aClass, Node node, String name) {
 		if (node.hasProperty(name)) {
 			getNodeIndex(aClass).remove(node, name);
-			if (value != null) {
-				getNodeIndex(aClass).add(node, name, value);
-			}
 		} else {
-			if (value == null) {
-				// TODO check back for collections
-				Iterator<Relationship> iterator = node.getRelationships(DynamicRelationshipType.withName(name))
-						.iterator();
-				while (iterator.hasNext()) {
-					getRelationshipIndex(aClass, name).remove(iterator.next());
-				}
+			Iterator<Relationship> iterator = node.getRelationships(DynamicRelationshipType.withName(name))
+					.iterator();
+			while (iterator.hasNext()) {
+				getRelationshipIndex(aClass, name).remove(iterator.next());
 			}
 		}
 	}
@@ -443,11 +457,12 @@ public class EntityManager {
 					field.setAccessible(true);
 					Object value = field.get(entity);
 					if (field.isAnnotationPresent(com.ontometrics.db.graph.Index.class)) {
-						updateIndex(entity.getClass(), existingNode, field.getName(), value);
+						deleteIndex(entity.getClass(), existingNode, field.getName());
 					}
 
 					if (!isTransient(field)) {
 						setProperty(existingNode, field.getName(), value);
+						updateIndex(existingNode, entity, field);
 					}
 
 				} catch (Exception e) {
