@@ -110,9 +110,10 @@ public class EntityManagerTest {
 	}
 
 	@Test
-	public void indexingRelationships(){
+	public void indexingRelationshipsWithProperties(){
 		Person parent = new Person("williams", new DateTime().minusYears(50).toDate());
 		person.setParent(parent);
+		person.setAddress(new Address("home", "LA", "CA"));
 		
 		Node personNode = entityManager.create(person);
 
@@ -123,12 +124,18 @@ public class EntityManagerTest {
 		assertThat(relationships.hasNext(), is(true));
 		assertThat(relationships.next(), is(parentRelationShip));
 		
-		
 		person.setParent(null);
 		entityManager.update(person, personNode);		
 		relationships = parentsIndex.get( "child", username, personNode, null );
 		assertThat(relationships.hasNext(), is(false));
+
+		Relationship addressRelationShip = personNode.getSingleRelationship(addressType, Direction.OUTGOING);
 		
+		ReadableRelationshipIndex addressIndex = (ReadableRelationshipIndex) entityManager.getRelationshipIndex(Person.class, "address"); 
+		relationships = addressIndex.get( "for", username, personNode, null );
+		assertThat(relationships.hasNext(), is(true));
+		assertThat(relationships.next(), is(addressRelationShip));
+
 	}
 
 	@Test

@@ -24,8 +24,10 @@ public @interface Index {
 	 * The field referenced in the "value", should not be a relationship.
 	 * 
 	 * Only set the key/value when you are indexing a relationship
+	 * 
+	 * We can also set the value with a method name, to invoke to get the value, the method should take no arguments
 	 * @return
 	 */
 	String value() default "n/a";
-
+	
 }

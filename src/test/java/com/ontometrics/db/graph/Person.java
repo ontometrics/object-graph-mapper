@@ -22,6 +22,7 @@ public class Person {
 	@Index
 	private Date birthDate;
 
+	@Index(key = "for", value = "getName")
 	private Address address;
 
 	@Index(key = "child", value = "name")
