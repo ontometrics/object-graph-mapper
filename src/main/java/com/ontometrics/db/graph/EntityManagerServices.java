@@ -2,6 +2,7 @@ package com.ontometrics.db.graph;
 
 import java.io.File;
 
+import org.neo4j.graphdb.GraphDatabaseService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +31,13 @@ public class EntityManagerServices {
 		EntityManagerFactory emf = new EntityManagerFactory();
 		emf.setRoot(root);
 		log.debug("root: {}", root);
-		entityManager = emf.getEntityManager("testdb");
+		entityManager = emf.getEntityManager();
+	}
+
+	public static void initForTests(GraphDatabaseService graphDatabase) {
+		EntityManagerFactory emf = new EntityManagerFactory();
+		entityManager = emf.getEntityManager(graphDatabase);
+		
 	}
 	
 

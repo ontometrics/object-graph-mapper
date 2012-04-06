@@ -1,8 +1,6 @@
 package com.ontometrics.db.graph;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
@@ -24,7 +22,7 @@ public class EntityManagerFactory {
 	/**
 	 * We want to hang on to databases that we have open.
 	 */
-	private Map<String, GraphDatabaseService> databases = new HashMap<String, GraphDatabaseService>();;
+	private GraphDatabaseService database = null;
 
 	/**
 	 * Get the EntityManager for a given database.
@@ -33,8 +31,17 @@ public class EntityManagerFactory {
 	 *            the name of the database that is sought
 	 * @return a database if it was found
 	 */
-	public EntityManager getEntityManager(String databaseName) {
-		return new EntityManager(getDatabase(databaseName));
+	public EntityManager getEntityManager() {
+		return new EntityManager(getDatabase());
+	}
+	
+	/**
+	 * Currently, this is package private to be used to initialize an in memory test instance.
+	 * @param graphdb
+	 * @return
+	 */
+	EntityManager getEntityManager(GraphDatabaseService graphdb) {
+		return new EntityManager(graphdb);
 	}
 
 	/**
@@ -45,10 +52,9 @@ public class EntityManagerFactory {
 	 *            the name of the database that is sought
 	 * @return a database
 	 */
-	private GraphDatabaseService getDatabase(String databaseName) {
-		GraphDatabaseService database = databases.get(databaseName);
+	private GraphDatabaseService getDatabase() {
 		if (database == null) {
-			database = openDatabase(databaseName);
+			database = openDatabase();
 		}
 		return database;
 	}
@@ -59,9 +65,8 @@ public class EntityManagerFactory {
 	 * @param databaseName
 	 * @return
 	 */
-	private GraphDatabaseService openDatabase(String databaseName) {
+	private GraphDatabaseService openDatabase() {
 		GraphDatabaseService database = new EmbeddedGraphDatabase(root.getAbsolutePath());
-		databases.put(databaseName, database);
 		return database;
 	}
 
