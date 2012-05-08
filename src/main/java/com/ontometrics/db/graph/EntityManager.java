@@ -12,6 +12,7 @@ import javax.persistence.Transient;
 
 import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.DynamicRelationshipType;
+import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
@@ -46,7 +47,7 @@ public class EntityManager {
 	/**
 	 * The database we are using through this manager.
 	 */
-	private EmbeddedGraphDatabase database;
+	private GraphDatabaseService database;
 
 	private Set<Long> updatedNodes = new HashSet<Long>();
 	
@@ -57,7 +58,7 @@ public class EntityManager {
 	 * @param database
 	 *            the database we will be using in this session
 	 */
-	public EntityManager(EmbeddedGraphDatabase database) {
+	public EntityManager(GraphDatabaseService database) {
 		this.database = database;
 		coreTypes = new HashSet<String>();
 		coreTypes.add(Object.class.getName());
@@ -71,7 +72,7 @@ public class EntityManager {
 	 * 
 	 * @return the valid, open database
 	 */
-	public EmbeddedGraphDatabase getDatabase() {
+	public GraphDatabaseService getDatabase() {
 		return database;
 	}
 

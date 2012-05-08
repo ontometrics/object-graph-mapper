@@ -6,17 +6,17 @@ import static org.hamcrest.Matchers.notNullValue;
 
 import java.util.Iterator;
 
+import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
+import org.neo4j.test.ImpermanentGraphDatabase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ontometrics.db.graph.model.Employee;
 import com.ontometrics.db.graph.model.Manager;
-import com.ontometrics.testing.TestGraphDatabase;
 
 /**
  * To verify that we can create a class that implements the Composite Design
@@ -30,20 +30,21 @@ public class CompositeTest {
 	
 	private EntityRepository<Manager> managerRepository = new EntityRepository<Manager>();
 	
-	@Rule
-	public TemporaryFolder dbFolder = new TemporaryFolder();
-	
-	@Rule
-	public TestGraphDatabase database = new TestGraphDatabase(dbFolder);
-
+	protected GraphDatabaseService graphDb;
 	private EntityManager entityManager;
 	
 	@Before
 	public void setup(){
-		entityManager = new EntityManager(database.getDatabase());
+		graphDb = new ImpermanentGraphDatabase();
+		entityManager = new EntityManager(graphDb);
 		managerRepository.setEntityManager(entityManager);
 	}
 
+	@After
+	public void tearDown() {
+		graphDb.shutdown();
+	}
+	
 	@Test
 	public void canPersistComposite(){
 		
@@ -61,12 +62,12 @@ public class CompositeTest {
 		
 		assertThat(pete.getSubordinates().size(), is(3));
 		
-		Node newNode = database.getDatabase().getNodeById(rootNodeID);
+		Node newNode = graphDb.getNodeById(rootNodeID);
 		
 		assertThat(newNode, is(notNullValue()));
 		
 		int nodeCount = 0;
-		Iterator<Node> i = database.getDatabase().getAllNodes().iterator();
+		Iterator<Node> i = graphDb.getAllNodes().iterator();
 		while (i.hasNext()){
 			nodeCount++;
 			i.next();

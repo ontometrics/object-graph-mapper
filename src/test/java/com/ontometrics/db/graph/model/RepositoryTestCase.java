@@ -16,7 +16,7 @@ public abstract class RepositoryTestCase{
 	public void setUp() {
 		EntityManagerFactory emf = new EntityManagerFactory();
 		deleteFileOrDirectory(emf.getRoot());
-		entityManager = emf.getEntityManager("testdb");
+		entityManager = emf.getEntityManager();
 	}
 
 	@After
