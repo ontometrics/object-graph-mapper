@@ -8,8 +8,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import javax.persistence.Transient;
-
 import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -569,7 +567,7 @@ public class EntityManager {
 	}
 
 	private static boolean isThePrimaryKey(Field field) {
-		return field.isAnnotationPresent(javax.persistence.Id.class) || field.isAnnotationPresent(Id.class);
+		return field.isAnnotationPresent(Id.class);
 	}
 
 	public void setDatabase(EmbeddedGraphDatabase database) {

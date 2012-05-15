@@ -73,7 +73,7 @@ public class EntityRepository<T> {
 	}
 
 	private static boolean isThePrimaryKey(Field field) {
-		return field.isAnnotationPresent(javax.persistence.Id.class) || field.isAnnotationPresent(Id.class);
+		return field.isAnnotationPresent(Id.class);
 	}
 
 	public void destroy(T entity, Object primaryKey) {

@@ -1,8 +1,11 @@
-package com.ontometrics.db.graph;
+package com.ontometrics.db.graph.model;
 
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
+
+import com.ontometrics.db.graph.Id;
+import com.ontometrics.db.graph.Index;
 
 public class Person {
 

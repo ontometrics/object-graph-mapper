@@ -2,8 +2,6 @@ package com.ontometrics.db.graph.model;
 
 import java.util.Date;
 
-import com.ontometrics.db.graph.Person;
-
 /**
  * An sub class of Person so we can test that parent class properties are
  * preserved in the graph DB.

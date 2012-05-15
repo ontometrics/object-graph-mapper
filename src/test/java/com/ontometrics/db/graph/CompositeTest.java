@@ -12,6 +12,7 @@ import org.junit.Test;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.test.ImpermanentGraphDatabase;
+import org.neo4j.tooling.GlobalGraphOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +68,7 @@ public class CompositeTest {
 		assertThat(newNode, is(notNullValue()));
 		
 		int nodeCount = 0;
-		Iterator<Node> i = graphDb.getAllNodes().iterator();
+		Iterator<Node> i = GlobalGraphOperations.at(graphDb).getAllNodes().iterator();
 		while (i.hasNext()){
 			nodeCount++;
 			i.next();

@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import com.ontometrics.db.graph.conversion.TypeConverter;
 import com.ontometrics.db.graph.conversion.TypeRegistry;
+import com.ontometrics.db.graph.model.Person;
 
 public class TypeRegistryTest {
 

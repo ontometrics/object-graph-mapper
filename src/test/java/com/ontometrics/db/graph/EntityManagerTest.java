@@ -29,9 +29,11 @@ import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.index.IndexHits;
 import org.neo4j.graphdb.index.ReadableRelationshipIndex;
 
-import com.ontometrics.db.graph.Person.Color;
+import com.ontometrics.db.graph.model.Address;
+import com.ontometrics.db.graph.model.Person.Color;
 import com.ontometrics.db.graph.model.AddressBook;
 import com.ontometrics.db.graph.model.Employee;
+import com.ontometrics.db.graph.model.Person;
 import com.ontometrics.testing.TestGraphDatabase;
 
 public class EntityManagerTest {

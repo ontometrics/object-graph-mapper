@@ -1,7 +1,7 @@
-package com.ontometrics.db.graph;
+package com.ontometrics.db.graph.model;
 
-import com.ontometrics.db.graph.Person;
-
+import com.ontometrics.db.graph.GeneratedId;
+import com.ontometrics.db.graph.Id;
 
 public class Address {
 

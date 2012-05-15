@@ -2,8 +2,6 @@ package com.ontometrics.db.graph.model;
 
 import java.util.Map;
 
-import com.ontometrics.db.graph.Person;
-
 public class AddressBook {
 
 	private Map<Person, String> phones;

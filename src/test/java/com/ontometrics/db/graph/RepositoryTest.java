@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import com.ontometrics.db.graph.model.Car;
 import com.ontometrics.db.graph.model.Employee;
 import com.ontometrics.db.graph.model.Manager;
+import com.ontometrics.db.graph.model.Person;
 import com.ontometrics.db.graph.model.RepositoryTestCase;
 import com.ontometrics.db.graph.model.SeniorManager;
 
