@@ -21,7 +21,9 @@ import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 
-import com.ontometrics.db.graph.Person.Color;
+import com.ontometrics.db.graph.model.Address;
+import com.ontometrics.db.graph.model.Person.Color;
+import com.ontometrics.db.graph.model.Person;
 import com.ontometrics.db.graph.model.AddressBook;
 import com.ontometrics.db.graph.model.Employee;
 import com.ontometrics.testing.TestGraphDatabase;

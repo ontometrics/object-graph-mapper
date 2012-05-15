@@ -4,7 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SeniorManager extends Manager {
+	
+	@SuppressWarnings("unused")
 	private static final Logger log = LoggerFactory.getLogger(SeniorManager.class);
+	
 	public SeniorManager() {
 		super();
 	}
