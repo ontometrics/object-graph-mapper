@@ -9,4 +9,4 @@ Goals of this project:
 * Put in an API layer so that we can use any graph database.
 * Allow for discovery, e.g. automatically evolving the schema as things change.
 
-This first version is working with neo4j. 
+This first version is working with neo4j.  Pretty simple to adapt to other graph/object databases.
